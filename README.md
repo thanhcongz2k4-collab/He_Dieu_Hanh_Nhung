@@ -1,1 +1,0 @@
-Hệ điều hành nhúng
