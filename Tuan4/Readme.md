@@ -59,6 +59,7 @@ Các file đầu ra chính nằm trong `output/images/`:
 ![Các file ảnh hệ thống sau khi build](S2_Build_Output_Images.png)
 
 Cắm thẻ nhớ vào BBB và chạy ta được 
+
 ![Cấu trúc thư mục Rootfs](S2_Rootfs_Structure_Verification.png)
 ## 4. Tạo và tích hợp package tùy chỉnh `hello-G2`
 
