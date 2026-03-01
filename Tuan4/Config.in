@@ -1,0 +1,4 @@
+config BR2_PACKAGE_HELLO_G2
+    bool "hello-G2"
+    help
+      Goi ung dung hello-G2 cua nhom S2.
