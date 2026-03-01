@@ -56,6 +56,7 @@ make 2>&1 | tee build.log
 Các file đầu ra chính nằm trong `output/images/`:
 - Boot: `MLO`, `u-boot.img`, `zImage`, `am335x-boneblack.dtb`
 - Rootfs: `rootfs.tar` (hoặc các định dạng khác tùy cấu hình)
+
 ![Các file ảnh hệ thống sau khi build](S2_Build_Output_Images.png)
 
 Cắm thẻ nhớ vào BBB và chạy ta được 
@@ -149,7 +150,9 @@ fatload mmc 0:1 0x88000000 am335x-boneblack.dtb
 setenv bootargs console=ttyO0,115200n8 root=/dev/mmcblk0p2 rw rootwait
 bootz 0x82000000 - 0x88000000
 ```
-![Quy trình nạp Kernel tại U-Boot](S2_Uboot_Manual_Boot_Process.png)
+
+![Quy trình nạp Kernel tại U-Boot](S2_BBB_Boot_Manual_Commands.png)
+
 Sau khi kernel khởi động, đăng nhập bằng `root`, sau đó chạy:
 
 ```bash
@@ -157,4 +160,4 @@ hello-G2
 ```
 Ta sẽ thấy thông báo chào từ nhóm S2.
 
-![Kết quả chạy lệnh hello-G2](images/S2_Final_Result_HelloG2.png)
+![Kết quả chạy lệnh hello-G2](ket-qua-chay-chuong-trinh-hello-G2.png)
