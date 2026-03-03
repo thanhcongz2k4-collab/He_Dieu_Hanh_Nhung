@@ -75,6 +75,18 @@ mkdir ~/package
 cd ~/package
 nano hello.c
 ```
+
+```c
+#include <stdio.h>
+
+int main(void) {
+    printf("--------------------------------------\n");
+    printf(" Xin chao, toi la Rimuru tempest thanh vien nhóm 2 \n");
+    printf(" Chuc moi nguoi nam moi vui ve \n");
+    printf("--------------------------------------\n");
+    return 0;
+}
+```
 ## 2. Sử dụng toolchain của buildroot để biên dịch
 Đường dẫn của tôi là: 
 
@@ -96,7 +108,7 @@ Copy file thực thi:
 
 # Copy file 'hello_g5' vừa tạo vào thư mục /usr/bin trên thẻ nhớ
 ```bash
-sudo cp hello_g5 /media/chien/rootfs/usr/bin/
+sudo cp hello /media/rimuru/ROOTFS/usr/bin/
 ```
 ## 4. Chạy thử lệnh trên BBB
 Chạy lệnh:
@@ -167,23 +179,15 @@ Sau khi build, file thực thi `hello-G2` sẽ được cài vào `usr/bin/` tro
 
 ## 2. Ghi sang thẻ SD (ví dụ trên Linux host)
 
-1) Gắn thẻ SD vào máy và xác định thiết bị (ví dụ `/dev/mmcblk0`).
-2) Tạo filesystem rootfs (cẩn thận: thao tác này xóa dữ liệu):
+1) Gắn thẻ SD vào máy và xác định thiết bị 
+2) Tạo filesystem rootfs :
 
 ```bash
-sudo mkfs.ext4 -L rootfs /dev/mmcblk0p2
-```
-
-3) Giải nén rootfs vào phân vùng mount của bạn:
-
-```bash
-sudo mount /dev/mmcblk0p2 /media/$USER/rootfs
-sudo tar -C /media/$USER/rootfs/ -xf output/images/rootfs.tar
+sudo rm -rf /media/rimuru/ROOTFS/*
+sudo tar -C /media/rimuru/ROOTFS/ -xf output/images/rootfs.tar
 sync
-sudo umount /media/$USER/rootfs
+sudo umount /media/rimuru/ROOTFS
 ```
-
-4) Thay thế các file boot trên phân vùng FAT32 (ví dụ `/dev/mmcblk0p1`): `MLO`, `u-boot.img`, `zImage`, `am335x-boneblack.dtb`.
 
 ## 3. Khởi động và kiểm tra trên BBB
 
