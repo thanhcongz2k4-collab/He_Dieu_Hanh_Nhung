@@ -17,7 +17,7 @@ sudo apt-get update && sudo apt-get install -y \
   python3 python3-matplotlib asciidoc w3m dblatex graphviz \
   patch diffutils perl sed tar gzip bzip2 findutils make binutils
 ```
-
+### I. BUILDROOT (1)
 ## 1. Clone Buildroot và chọn nhánh ổn định
 
 ```bash
@@ -62,7 +62,52 @@ Các file đầu ra chính nằm trong `output/images/`:
 Cắm thẻ nhớ vào BBB và chạy ta được 
 
 ![Cấu trúc thư mục Rootfs](S2_Rootfs_Structure_Verification.png)
-## 4. Tạo và tích hợp package tùy chỉnh `hello-G2`
+
+### II. BUILD DRIVE BY TOOLCHAIN (2)
+
+## 1. Tạo mã nguồn C trên máy host
+
+Tạo thư mục và file .c bằng câu lệnh
+
+```bash
+cd ~/Documents
+mkdir ~/package
+cd ~/package
+nano hello.c
+```
+## 2. Sử dụng toolchain của buildroot để biên dịch
+Đường dẫn của tôi là: 
+
+```bash 
+~/Documents/buildroot/output/host/bin/arm-none-linux-gnueabihf-gcc
+```
+
+Sử dụng câu lệnh
+```bash
+~/Documents/buildroot/output/host/bin/arm-none-linux-gnueabihf-gcc -o hello hello.c
+```
+![----](BBB-hello-result-toolchain.png)
+
+![---](BBB-hello-build-by-toolchain.png)
+
+## 3. Đưa chương trình vào RootFS trên thẻ nhớ
+
+Copy file thực thi:
+
+# Copy file 'hello_g5' vừa tạo vào thư mục /usr/bin trên thẻ nhớ
+```bash
+sudo cp hello_g5 /media/chien/rootfs/usr/bin/
+```
+## 4. Chạy thử lệnh trên BBB
+Chạy lệnh:
+```bash
+hello
+```
+
+![Kết quả chạy lệnh hello-G2](BBB-run-hello-toolchain.jpg)
+
+### III. BUILD PACKAGE (3)
+## 1. Tạo và tích hợp package tùy chỉnh `hello-G2`
 
 1) Tạo cấu trúc package:
 
@@ -120,7 +165,7 @@ make 2>&1 | tee build.log
 
 Sau khi build, file thực thi `hello-G2` sẽ được cài vào `usr/bin/` trong rootfs.
 
-## 5. Ghi sang thẻ SD (ví dụ trên Linux host)
+## 2. Ghi sang thẻ SD (ví dụ trên Linux host)
 
 1) Gắn thẻ SD vào máy và xác định thiết bị (ví dụ `/dev/mmcblk0`).
 2) Tạo filesystem rootfs (cẩn thận: thao tác này xóa dữ liệu):
@@ -140,7 +185,7 @@ sudo umount /media/$USER/rootfs
 
 4) Thay thế các file boot trên phân vùng FAT32 (ví dụ `/dev/mmcblk0p1`): `MLO`, `u-boot.img`, `zImage`, `am335x-boneblack.dtb`.
 
-## 6. Khởi động và kiểm tra trên BBB
+## 3. Khởi động và kiểm tra trên BBB
 
 Trong U-Boot, bạn có thể dùng các lệnh:
 
@@ -161,3 +206,4 @@ hello-G2
 Ta sẽ thấy thông báo chào từ nhóm S2.
 
 ![Kết quả chạy lệnh hello-G2](ket-qua-chay-chuong-trinh-hello-G2.png)
+
