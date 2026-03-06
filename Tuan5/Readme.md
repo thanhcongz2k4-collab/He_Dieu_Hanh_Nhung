@@ -257,16 +257,10 @@ make
 
 ### 8. So sánh Static và Dynamic Linking
 
-| Loại liên kết   | Kích thước binary | Ưu điểm | Nhược điểm |
-|-----------------|-------------------|---------|------------|
-| Dynamic (shared)| ~5 KB             | - Kích thước nhỏ
-- Sử dụng chung giữa nhiều chương trình
-- Có thể cập nhật thư viện mà không cần biên dịch lại chương trình | - Phải có thư viện .so tại thời điểm chạy
-- Có thể gây ra "dependency hell" nếu phiên bản không tương thích |
-| Static          | ~328 KB           | - Binary tự chứa tất cả mã
-- Chạy độc lập, không cần thư viện ngoài | - Kích thước lớn
-- Cập nhật thư viện yêu cầu tái biên dịch
-|
+| Loại liên kết | Kích thước binary | Ưu điểm | Nhược điểm |
+|---------------|------------------|---------|------------|
+| Dynamic (shared) | ~5 KB | - Kích thước nhỏ <br> - Sử dụng chung giữa nhiều chương trình <br> - Có thể cập nhật thư viện mà không cần biên dịch lại chương trình | - Phải có thư viện `.so` tại thời điểm chạy <br> - Có thể gây ra *dependency hell* nếu phiên bản không tương thích |
+| Static | ~328 KB | - Binary tự chứa tất cả mã <br> - Chạy độc lập, không cần thư viện ngoài | - Kích thước lớn <br> - Cập nhật thư viện yêu cầu tái biên dịch |
 
 #### Kết quả phụ thuộc
 
