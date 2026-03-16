@@ -1,4 +1,4 @@
-# 🔆 BeagleBone Black — LED GPIO Kernel Driver Series -Nhom 2
+# BeagleBone Black — LED GPIO Kernel Driver Series -Nhom 2
 
 > Chuỗi 3 bài thực hành xây dựng Linux Kernel Driver điều khiển LED rời trên **BeagleBone Black (BBB)** sử dụng hệ điều hành tùy chỉnh từ **Buildroot**.
 
