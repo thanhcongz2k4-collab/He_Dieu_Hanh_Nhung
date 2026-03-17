@@ -119,6 +119,12 @@ MODULE_AUTHOR("Rimuru");
 
 ### 4. Cấu hình Buildroot
 
+**File:** `package/led_driver/src/Makefile`
+
+```kconfig
+obj-m += led_driver.o
+```
+
 **File:** `package/led_driver/Config.in`
 
 ```kconfig
@@ -188,6 +194,8 @@ rmmod led_driver
 
 > Terminal xác nhận: driver nạp thành công, `/dev/led_test` được tạo, LED bật/tắt theo lệnh `echo`, driver gỡ sạch bằng `rmmod`.
 
+
+[Xem video demo - Bài 1](https://drive.google.com/file/d/1aWS4AcS4Ko4CmKZKsNlZ3gqYcEieXwPV/view?usp=sharing)
 ---
 
 ## Bài 2: User-space Blink Application
@@ -334,6 +342,7 @@ blink_app          # Chạy ứng dụng
 > Hệ thống in ra: `Lỗi: Không tìm thấy Driver! ...: No such file or directory`  
 > Board vẫn hoàn toàn an toàn — không gây hỏng hóc phần cứng.
 
+[Xem video demo - Bài 2](https://drive.google.com/file/d/1jnXDg9v0OxWd3cyyrzbDTU9ep_vQh54a/view?usp=sharing)
 ---
 
 ## Bài 3: Auto-Start Service
