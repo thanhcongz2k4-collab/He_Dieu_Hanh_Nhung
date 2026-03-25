@@ -233,7 +233,7 @@ make
 
 ---
 
-## Bước 5 — Tích hợp với Library và Application
+## Bước 5 — VD sử dụng hàm write của driver oled1306
 
 `ssd1306.ko` đóng vai trò **thin driver** — chỉ nhận raw bytes từ user-space và forward xuống I2C. Toàn bộ logic hiển thị (init, clear, draw text, draw pixel, ...) nằm ở user-space.
 
