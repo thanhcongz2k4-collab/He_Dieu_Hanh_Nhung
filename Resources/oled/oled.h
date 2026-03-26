@@ -13,6 +13,7 @@
 
 // Sử dụng SPL cho STM32F103
 #include "stm32f10x.h"
+#include "../kernel_driver/oled_i2c.h"
 #include "oled_fonts.h"
 
 // #define FLIP_IMG
@@ -25,16 +26,6 @@
 #else
 #define OLED_X_OFFSET_LOWER 0x00
 #define OLED_X_OFFSET_UPPER 0x00
-#endif
-
-/* vvv I2C config vvv */
-
-#ifndef OLED_I2C_PORT
-#define OLED_I2C_PORT        I2C2
-#endif
-
-#ifndef OLED_I2C_ADDR
-#define OLED_I2C_ADDR        (0x3C << 1)
 #endif
 
 // SSD1306 OLED height in pixels

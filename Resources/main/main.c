@@ -7,7 +7,7 @@ int main(void)
     
     uint8_t *str = "Hello, World!";
     Oled_StringSize_t str_size = Oled_GetStringSize(str, &DEFAULT_FONT);
-    Oled_FillRectangle((OLED_WIDTH - str_size.width) / 2 - 5, (OLED_HEIGHT - str_size.height) / 2 - 5, 
+    Oled_DrawRectangle((OLED_WIDTH - str_size.width) / 2 - 5, (OLED_HEIGHT - str_size.height) / 2 - 5, 
                        (OLED_WIDTH + str_size.width) / 2 + 5, (OLED_HEIGHT + str_size.height) / 2 + 5, White);
                        
     Oled_SetCursor((OLED_WIDTH - str_size.width) / 2, (OLED_HEIGHT + str_size.height) / 2);

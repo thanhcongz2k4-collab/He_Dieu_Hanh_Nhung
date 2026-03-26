@@ -2,6 +2,7 @@
 ".\objects\main.o"
 ".\objects\oled.o"
 ".\objects\oled_fonts.o"
+".\objects\oled_i2c.o"
 ".\objects\clib_os.o"
 ".\objects\cmsis_os2.o"
 ".\objects\os_systick.o"

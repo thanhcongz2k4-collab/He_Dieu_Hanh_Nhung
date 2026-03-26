@@ -19,7 +19,8 @@
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\stm32f10x_rcc.h \
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\stm32f10x_usart.h \
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\misc.h \
+  Resources\oled\..\kernel_driver\oled_i2c.h \
+  D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\stdlib.h \
   Resources\oled\oled_fonts.h \
   D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\math.h \
-  D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\stdlib.h \
   D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\string.h
