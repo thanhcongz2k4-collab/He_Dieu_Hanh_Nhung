@@ -50,9 +50,18 @@ output/build/linux-6.16.5/arch/arm/boot/dts/ti/omap/am335x-boneblack.dts
 Thêm node OLED vào `i2c2`:
 
 ```dts
+&am33xx_pinmux {
+    i2c2_pins: i2c2_pins {
+        pinctrl-single,pins = 
+            AM33XX_IOPAD(0x190, PIN_INPUT | MUX_MODE2) /* P9_19 I2C2_SDA */
+            AM33XX_IOPAD(0x194, PIN_INPUT | MUX_MODE2) /* P9_20 I2C2_SCL */
+        >;
+    };
+};
 &i2c2 {
     status = "okay";
-
+    pinctrl-names = "default";
+    pinctrl-0 = <&i2c2_pins>;
     oled@3c {
         compatible = "solomon,ssd1306";
         reg = <0x3c>;
@@ -124,34 +133,25 @@ clean:
 #include <linux/of.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
-
+#include <linux/device.h> 
 #define DEVICE_NAME "oled"
-
 static struct i2c_client *oled_client;
 static int major;
+static struct class *oled_class;  
+static struct device *oled_device;
 
-static ssize_t oled_write(struct file *file,
-                          const char __user *buf,
-                          size_t len, loff_t *off)
-{
-    u8 data[32];
-    int i, ret;
-
+static ssize_t oled_write(struct file *file, const char __user *buf, size_t len, loff_t *off){
+    u8 data[32]; 
+    int ret;
     if (len > sizeof(data))
         len = sizeof(data);
-
     if (copy_from_user(data, buf, len))
         return -EFAULT;
-
-    for (i = 0; i < len; i++) {
-        ret = i2c_smbus_write_byte(oled_client, data[i]);
-        if (ret < 0)
-            return ret;
-    }
-
+    ret = i2c_master_send(oled_client, data, len);
+    if (ret < 0)
+        return ret;
     return len;
 }
-
 static struct file_operations fops = {
     .owner = THIS_MODULE,
     .write = oled_write,
@@ -159,35 +159,48 @@ static struct file_operations fops = {
 
 static int ssd1306_probe(struct i2c_client *client)
 {
-    printk("SSD1306 minimal driver\n");
     oled_client = client;
     major = register_chrdev(0, DEVICE_NAME, &fops);
+    if (major < 0)
+        return major;
+    oled_class = class_create(DEVICE_NAME);
+    if (IS_ERR(oled_class)) {
+        unregister_chrdev(major, DEVICE_NAME);
+        return PTR_ERR(oled_class);
+    }
+    oled_device = device_create(oled_class, NULL,
+                                MKDEV(major, 0), NULL, DEVICE_NAME);
+    if (IS_ERR(oled_device)) {
+        class_destroy(oled_class);
+        unregister_chrdev(major, DEVICE_NAME);
+        return PTR_ERR(oled_device);
+    }
+    printk("SSD1306 probe OK, major=%d\n", major);
     return 0;
 }
-
 static void ssd1306_remove(struct i2c_client *client)
 {
+    device_destroy(oled_class, MKDEV(major, 0));
+    class_destroy(oled_class);
     unregister_chrdev(major, DEVICE_NAME);
 }
-
 static const struct of_device_id ssd1306_of_match[] = {
     { .compatible = "solomon,ssd1306" },
     {}
 };
 MODULE_DEVICE_TABLE(of, ssd1306_of_match);
-
 static struct i2c_driver ssd1306_driver = {
     .driver = {
         .name = "ssd1306",
         .of_match_table = ssd1306_of_match,
     },
-    .probe  = ssd1306_probe,
+    .probe = ssd1306_probe,
     .remove = ssd1306_remove,
 };
-
 module_i2c_driver(ssd1306_driver);
-
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("SSD1306 OLED I2C minimal driver");
+MODULE_AUTHOR("rimuru");
 ```
 
 ### `oled_driver.mk`
@@ -254,93 +267,154 @@ ssd1306.ko          ← kernel module: forward bytes xuống I2C
 SSD1306 OLED Hardware
 ```
 
-### `oled_lib.h`
 
-```c
-#ifndef OLED_LIB_H
-#define OLED_LIB_H
-
-#include <stdint.h>
-
-int  oled_open(const char *dev);                     // mở /dev/oled, trả về fd
-void oled_init(int fd);                              // gửi chuỗi lệnh khởi tạo SSD1306
-void oled_clear(int fd);                             // xóa toàn bộ màn hình
-void oled_write_cmd(int fd, uint8_t cmd);            // gửi 1 command byte
-void oled_write_data(int fd, uint8_t *buf, int len); // gửi data bytes
-void oled_close(int fd);
-
-#endif
-```
-
-### `oled_lib.c`
-
-```c
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdint.h>
-#include "oled_lib.h"
-
-// Chuỗi khởi tạo cơ bản cho SSD1306 128x64
-static uint8_t init_cmds[] = {
-    0x00,         // Co=0, D/C#=0 → command stream
-    0xAE,         // Display OFF
-    0xD5, 0x80,   // Set display clock
-    0xA8, 0x3F,   // Set multiplex ratio (64)
-    0xD3, 0x00,   // Set display offset
-    0x40,         // Set start line = 0
-    0x8D, 0x14,   // Charge pump enable
-    0x20, 0x00,   // Memory mode: horizontal
-    0xA1,         // Segment remap
-    0xC8,         // COM scan direction
-    0xDA, 0x12,   // COM pins config
-    0x81, 0xCF,   // Set contrast
-    0xD9, 0xF1,   // Pre-charge period
-    0xDB, 0x40,   // VCOMH deselect level
-    0xA4,         // Entire display ON (follow RAM)
-    0xA6,         // Normal display (not inverted)
-    0xAF,         // Display ON
-};
-
-int oled_open(const char *dev) {
-    return open(dev, O_WRONLY);
-}
-
-void oled_init(int fd) {
-    write(fd, init_cmds, sizeof(init_cmds));
-}
-
-void oled_write_cmd(int fd, uint8_t cmd) {
-    uint8_t buf[2] = {0x00, cmd}; // 0x00 = command byte prefix
-    write(fd, buf, 2);
-}
-
-void oled_write_data(int fd, uint8_t *buf, int len) {
-    write(fd, buf, len);
-}
-
-void oled_clear(int fd) {
-    uint8_t blank[128] = {0};
-    for (int page = 0; page < 8; page++) {
-        oled_write_cmd(fd, 0xB0 + page); // set page address
-        oled_write_cmd(fd, 0x00);        // set column low nibble
-        oled_write_cmd(fd, 0x10);        // set column high nibble
-        oled_write_data(fd, blank, sizeof(blank));
-    }
-}
-
-void oled_close(int fd) {
-    close(fd);
-}
-```
 
 ### `oled_app.c`
 
 ```c
 #include <stdio.h>
-#include "oled_lib.h"
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdint.h>
+#include <string.h>
 
-int main(void) {
-    int fd = oled_open("/dev/oled");
+// Font 5x7 cơ bản (chỉ chứa chữ cần dùng A-Z, space)
+static const uint8_t font5x7[][5] = {
+    [' '] = {0x00, 0x00, 0x00, 0x00, 0x00},
+    ['A'] = {0x7E, 0x11, 0x11, 0x11, 0x7E},
+    ['B'] = {0x7F, 0x49, 0x49, 0x49, 0x36},
+    ['C'] = {0x3E, 0x41, 0x41, 0x41, 0x22},
+    ['D'] = {0x7F, 0x41, 0x41, 0x22, 0x1C},
+    ['E'] = {0x7F, 0x49, 0x49, 0x49, 0x41},
+    ['F'] = {0x7F, 0x09, 0x09, 0x09, 0x01},
+    ['G'] = {0x3E, 0x41, 0x49, 0x49, 0x7A},
+    ['H'] = {0x7F, 0x08, 0x08, 0x08, 0x7F},
+    ['I'] = {0x00, 0x41, 0x7F, 0x41, 0x00},
+    ['J'] = {0x20, 0x40, 0x41, 0x3F, 0x01},
+    ['K'] = {0x7F, 0x08, 0x14, 0x22, 0x41},
+    ['L'] = {0x7F, 0x40, 0x40, 0x40, 0x40},
+    ['M'] = {0x7F, 0x02, 0x0C, 0x02, 0x7F},
+    ['N'] = {0x7F, 0x04, 0x08, 0x10, 0x7F},
+    ['O'] = {0x3E, 0x41, 0x41, 0x41, 0x3E},
+    ['P'] = {0x7F, 0x09, 0x09, 0x09, 0x06},
+    ['Q'] = {0x3E, 0x41, 0x51, 0x21, 0x5E},
+    ['R'] = {0x7F, 0x09, 0x19, 0x29, 0x46},
+    ['S'] = {0x46, 0x49, 0x49, 0x49, 0x31},
+    ['T'] = {0x01, 0x01, 0x7F, 0x01, 0x01},
+    ['U'] = {0x3F, 0x40, 0x40, 0x40, 0x3F},
+    ['V'] = {0x1F, 0x20, 0x40, 0x20, 0x1F},
+    ['W'] = {0x3F, 0x40, 0x38, 0x40, 0x3F},
+    ['X'] = {0x63, 0x14, 0x08, 0x14, 0x63},
+    ['Y'] = {0x07, 0x08, 0x70, 0x08, 0x07},
+    ['Z'] = {0x61, 0x51, 0x49, 0x45, 0x43},
+    ['a'] = {0x20, 0x54, 0x54, 0x54, 0x78},
+    ['b'] = {0x7F, 0x48, 0x44, 0x44, 0x38},
+    ['c'] = {0x38, 0x44, 0x44, 0x44, 0x20},
+    ['d'] = {0x38, 0x44, 0x44, 0x48, 0x7F},
+    ['e'] = {0x38, 0x54, 0x54, 0x54, 0x18},
+    ['f'] = {0x08, 0x7E, 0x09, 0x01, 0x02},
+    ['g'] = {0x0C, 0x52, 0x52, 0x52, 0x3E},
+    ['h'] = {0x7F, 0x08, 0x04, 0x04, 0x78},
+    ['i'] = {0x00, 0x44, 0x7D, 0x40, 0x00},
+    ['j'] = {0x20, 0x40, 0x44, 0x3D, 0x00},
+    ['k'] = {0x7F, 0x10, 0x28, 0x44, 0x00},
+    ['l'] = {0x00, 0x41, 0x7F, 0x40, 0x00},
+    ['m'] = {0x7C, 0x04, 0x18, 0x04, 0x78},
+    ['n'] = {0x7C, 0x08, 0x04, 0x04, 0x78},
+    ['o'] = {0x38, 0x44, 0x44, 0x44, 0x38},
+    ['p'] = {0x7C, 0x14, 0x14, 0x14, 0x08},
+    ['q'] = {0x08, 0x14, 0x14, 0x18, 0x7C},
+    ['r'] = {0x7C, 0x08, 0x04, 0x04, 0x08},
+    ['s'] = {0x48, 0x54, 0x54, 0x54, 0x20},
+    ['t'] = {0x04, 0x3F, 0x44, 0x40, 0x20},
+    ['u'] = {0x3C, 0x40, 0x40, 0x20, 0x7C},
+    ['v'] = {0x1C, 0x20, 0x40, 0x20, 0x1C},
+    ['w'] = {0x3C, 0x40, 0x30, 0x40, 0x3C},
+    ['x'] = {0x44, 0x28, 0x10, 0x28, 0x44},
+    ['y'] = {0x0C, 0x50, 0x50, 0x50, 0x3C},
+    ['z'] = {0x44, 0x64, 0x54, 0x4C, 0x44},
+};
+
+int oled_write(int fd, uint8_t mode, uint8_t byte) {
+    uint8_t buf[2];
+    buf[0] = mode ? 0x40 : 0x00;
+    buf[1] = byte;
+    if (write(fd, buf, 2) != 2) {
+        perror("write");
+        return -1;
+    }
+    return 0;
+}
+
+void oled_init(int fd) {
+    oled_write(fd, 0, 0xAE);
+    oled_write(fd, 0, 0xD5);
+    oled_write(fd, 0, 0x80);
+    oled_write(fd, 0, 0xA8);
+    oled_write(fd, 0, 0x3F);
+    oled_write(fd, 0, 0xD3);
+    oled_write(fd, 0, 0x00);
+    oled_write(fd, 0, 0x40);
+    oled_write(fd, 0, 0x8D);
+    oled_write(fd, 0, 0x14);
+    oled_write(fd, 0, 0x20);
+    oled_write(fd, 0, 0x00);
+    oled_write(fd, 0, 0xA1);
+    oled_write(fd, 0, 0xC8);
+    oled_write(fd, 0, 0xDA);
+    oled_write(fd, 0, 0x12);
+    oled_write(fd, 0, 0x81);
+    oled_write(fd, 0, 0x7F);
+    oled_write(fd, 0, 0xD9);
+    oled_write(fd, 0, 0xF1);
+    oled_write(fd, 0, 0xDB);
+    oled_write(fd, 0, 0x40);
+    oled_write(fd, 0, 0xA4);
+    oled_write(fd, 0, 0xA6);
+    oled_write(fd, 0, 0xAF);
+}
+
+void oled_clear(int fd) {
+    for (int page = 0; page < 8; page++) {
+        oled_write(fd, 0, 0xB0 + page);
+        oled_write(fd, 0, 0x00);
+        oled_write(fd, 0, 0x10);
+        for (int col = 0; col < 128; col++) {
+            oled_write(fd, 1, 0x00);
+        }
+    }
+}
+
+// Vẽ 1 ký tự tại page và cột x
+void oled_draw_char(int fd, uint8_t page, uint8_t x, char c) {
+    // Giới hạn index font
+    if (c < ' ' || c > 'z') c = ' ';
+
+    // Set vị trí
+    oled_write(fd, 0, 0xB0 + page);         // page
+    oled_write(fd, 0, (x & 0x0F));          // column low
+    oled_write(fd, 0, 0x10 | (x >> 4));     // column high
+
+    // Gửi 5 cột pixel của ký tự
+    for (int i = 0; i < 5; i++) {
+        oled_write(fd, 1, font5x7[(uint8_t)c][i]);
+    }
+    // 1 cột trống để cách chữ
+    oled_write(fd, 1, 0x00);
+}
+
+// Vẽ chuỗi tại page, bắt đầu từ cột x
+void oled_draw_string(int fd, uint8_t page, uint8_t x, const char *str) {
+    while (*str) {
+        oled_draw_char(fd, page, x, *str++);
+        x += 6; // 5 pixel chữ + 1 pixel cách
+        if (x >= 128) break;
+    }
+}
+
+int main() {
+    int fd = open("/dev/oled", O_RDWR);
     if (fd < 0) {
         perror("open /dev/oled");
         return 1;
@@ -348,13 +422,9 @@ int main(void) {
 
     oled_init(fd);
     oled_clear(fd);
+    oled_draw_string(fd, 3, 10, "Hello Rimuru");
 
-    // Ghi dữ liệu hiển thị tuỳ ý tại đây:
-    // - vẽ pixel bitmap
-    // - render text
-    // - hiển thị icon, ...
-
-    oled_close(fd);
+    close(fd);
     return 0;
 }
 ```
