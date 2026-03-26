@@ -21,7 +21,7 @@ void Oled_Init(void)
         com_pins_cfg = 0x02;
     }
 
-    I2Cx_Init();
+    Oled_Open();
     for(volatile int i=0; i<0xfffff; i++);
 
     Oled_WriteCommand(0xAE);

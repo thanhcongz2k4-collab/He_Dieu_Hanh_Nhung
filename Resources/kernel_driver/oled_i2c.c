@@ -1,5 +1,6 @@
 #include "oled_i2c.h"
 
+#if defined(TEST_STM32)
 #define OLED_TIMEOUT 	1e4
 
 #define WAIT_FLAG(FLAG)\
@@ -9,7 +10,7 @@
 int IIC_OLED_TIMEOUT = 0;
 
 
-void I2Cx_Init(void) 
+void Oled_Open(void) 
 {
     GPIO_InitTypeDef GPIO_InitStruct;
     I2C_InitTypeDef I2C_InitStruct;
@@ -43,7 +44,7 @@ void I2Cx_Init(void)
 }
 
 // Send a byte to the command register
-void Oled_WriteCommand(uint8_t byte) 
+void Oled_WriteCommand(uint8_t cmd) 
 {
     // Sử dụng SPL thay cho HAL
     // Gửi byte lệnh qua I2C2
@@ -57,7 +58,7 @@ void Oled_WriteCommand(uint8_t byte)
     WAIT_FLAG (!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));
     I2C_SendData(OLED_I2C_PORT, 0x00); // Control byte: Co=0, D/C#=0
     WAIT_FLAG (!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_BYTE_TRANSMITTING));
-    I2C_SendData(OLED_I2C_PORT, byte);
+    I2C_SendData(OLED_I2C_PORT, cmd);
     WAIT_FLAG (!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_BYTE_TRANSMITTING));
     I2C_GenerateSTOP(OLED_I2C_PORT, ENABLE);
 }
@@ -79,3 +80,30 @@ void Oled_WriteData(uint8_t* buffer, size_t buff_size)
     }
     I2C_GenerateSTOP(OLED_I2C_PORT, ENABLE);
 }
+
+#else
+
+#define OLED_DEVICE "/dev/oled"
+
+static int fd = -1;
+
+void Oled_Open(void) 
+{
+    fd = open(OLED_DEVICE, O_WRONLY);
+    if (fd < 0) {
+        perror("open %s", OLED_DEVICE);
+        return;
+    }
+}
+
+void Oled_WriteCommand(uint8_t cmd) 
+{
+    uint8_t buf[2] = {0x00, cmd}; // 0x00 = command byte prefix
+    write(fd, buf, 2);
+}
+
+void Oled_WriteData(uint8_t* buffer, size_t buff_size) 
+{
+    write(fd, buffer, buff_size);
+}
+#endif
