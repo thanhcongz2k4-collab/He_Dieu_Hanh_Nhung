@@ -1,0 +1,365 @@
+#include "oled.h"
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>  // For memcpy
+#include <math.h>
+
+#define OLED_TIMEOUT 	1e4
+
+#define WAIT_FLAG(FLAG)\
+	IIC_OLED_TIMEOUT = OLED_TIMEOUT;\
+	while((FLAG) && (IIC_OLED_TIMEOUT--));
+	
+int IIC_OLED_TIMEOUT = 0;
+
+// Screenbuffer
+static uint8_t oled_buffer[OLED_BUFFER_SIZE];
+
+// Screen object
+static Oled_t Oled;
+void I2Cx_Init(void) 
+{
+    GPIO_InitTypeDef GPIO_InitStruct;
+    I2C_InitTypeDef I2C_InitStruct;
+
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
+
+    if (OLED_I2C_PORT == I2C1) 
+    {
+        RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C1, ENABLE);
+        GPIO_InitStruct.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7;
+    } 
+    else if (OLED_I2C_PORT == I2C2) 
+    {
+        RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C2, ENABLE);
+        GPIO_InitStruct.GPIO_Pin = GPIO_Pin_10 | GPIO_Pin_11;
+    }
+    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AF_OD;
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    I2C_DeInit(OLED_I2C_PORT);
+    I2C_InitStruct.I2C_ClockSpeed = 400000;
+    I2C_InitStruct.I2C_Mode = I2C_Mode_I2C;
+    I2C_InitStruct.I2C_DutyCycle = I2C_DutyCycle_2;
+    I2C_InitStruct.I2C_Ack = I2C_Ack_Disable;
+    I2C_InitStruct.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
+    I2C_Init(OLED_I2C_PORT, &I2C_InitStruct);
+
+    I2C_Cmd(OLED_I2C_PORT, ENABLE);
+}
+
+// Send a byte to the command register
+void Oled_WriteCommand(uint8_t byte) 
+{
+    // Sử dụng SPL thay cho HAL
+    // Gửi byte lệnh qua I2C2
+    // OLED_I2C_ADDR là địa chỉ 7 bit đã dịch trái 1 bit
+    // 0x00 là control byte cho lệnh
+    while(I2C_GetFlagStatus(OLED_I2C_PORT, I2C_FLAG_BUSY));
+
+    I2C_GenerateSTART(OLED_I2C_PORT, ENABLE);
+    WAIT_FLAG (!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_MODE_SELECT));
+    I2C_Send7bitAddress(OLED_I2C_PORT, OLED_I2C_ADDR, I2C_Direction_Transmitter);
+    WAIT_FLAG (!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));
+    I2C_SendData(OLED_I2C_PORT, 0x00); // Control byte: Co=0, D/C#=0
+    WAIT_FLAG (!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_BYTE_TRANSMITTING));
+    I2C_SendData(OLED_I2C_PORT, byte);
+    WAIT_FLAG (!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_BYTE_TRANSMITTING));
+    I2C_GenerateSTOP(OLED_I2C_PORT, ENABLE);
+}
+
+// Send data
+void Oled_WriteData(uint8_t* buffer, size_t buff_size) 
+{
+    while(I2C_GetFlagStatus(OLED_I2C_PORT, I2C_FLAG_BUSY));
+
+    I2C_GenerateSTART(OLED_I2C_PORT, ENABLE);
+    WAIT_FLAG (!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_MODE_SELECT));
+    I2C_Send7bitAddress(OLED_I2C_PORT, OLED_I2C_ADDR, I2C_Direction_Transmitter);
+    WAIT_FLAG (!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));
+    I2C_SendData(OLED_I2C_PORT, 0x40); // Control byte: Co=0, D/C#=1
+    WAIT_FLAG (!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_BYTE_TRANSMITTING));
+    for (size_t i = 0; i < buff_size; i++) {
+        I2C_SendData(OLED_I2C_PORT, buffer[i]);
+        WAIT_FLAG (!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_BYTE_TRANSMITTING));
+    }
+    I2C_GenerateSTOP(OLED_I2C_PORT, ENABLE);
+}
+
+/* Initialize the oled screen */
+void Oled_Init(void) 
+{
+    I2Cx_Init();
+    for(volatile int i=0; i<0xfffff; i++);
+
+    Oled_WriteCommand(0xAE);
+    Oled_WriteCommand(0x20); // memory addressing mode
+    Oled_WriteCommand(0x00); // horizontal
+    Oled_WriteCommand(0xB0);
+    Oled_WriteCommand(0xC8);
+    Oled_WriteCommand(0x00);
+    Oled_WriteCommand(0x10);
+    Oled_WriteCommand(0x40);
+    Oled_WriteCommand(0x81);
+    Oled_WriteCommand(0x7F);
+    Oled_WriteCommand(0xA1);
+    Oled_WriteCommand(0xA6);
+    Oled_WriteCommand(0xA8);
+    Oled_WriteCommand(0x3F);
+    Oled_WriteCommand(0xA4);
+    Oled_WriteCommand(0xD3);
+    Oled_WriteCommand(0x00);
+    Oled_WriteCommand(0xD5);
+    Oled_WriteCommand(0x80);
+    Oled_WriteCommand(0xD9);
+    Oled_WriteCommand(0xF1);
+    Oled_WriteCommand(0xDA);
+    Oled_WriteCommand(0x12);
+    Oled_WriteCommand(0xDB);
+    Oled_WriteCommand(0x40);
+    Oled_WriteCommand(0x8D);
+    Oled_WriteCommand(0x14);
+    Oled_WriteCommand(0xAF);
+    
+    // Clear screen
+    Oled_Fill(Black);
+    
+    // Flush buffer to screen
+    Oled_UpdateScreen();
+    
+    // Set default values for screen object
+    Oled.CurrentX = 0;
+    Oled.CurrentY = 0;
+    
+    Oled.Initialized = 1;
+}
+
+/* Fill the whole screen with the given color */
+void Oled_Fill(Oled_Color_e color) 
+{
+    memset(oled_buffer, (color == Black) ? 0x00 : 0xFF, sizeof(oled_buffer));
+}
+
+/* Write the screenbuffer with changed to the screen */
+void Oled_UpdateScreen(void) 
+{
+    // Write data to each page of RAM. Number of pages
+    // depends on the screen height:
+    //
+    //  * 32px   ==  4 pages
+    //  * 64px   ==  8 pages
+    //  * 128px  ==  16 pages
+    for(uint8_t page = 0; page < OLED_HEIGHT/8; page++) 
+    {
+        Oled_WriteCommand(0xB0 + page); // Set page address
+        Oled_WriteCommand(0x00 + OLED_X_OFFSET_LOWER); // Set lower column address
+        Oled_WriteCommand(0x10 + OLED_X_OFFSET_UPPER); // Set higher column address
+        Oled_WriteData(&oled_buffer[OLED_WIDTH*page], OLED_WIDTH);
+    }
+}
+
+/*
+ * Draw one pixel in the screenbuffer
+ * X => X Coordinate
+ * Y => Y Coordinate
+ * color => Pixel color
+ */
+void Oled_DrawPixel(uint8_t x, uint8_t y, Oled_Color_e color) 
+{
+    
+#ifdef FLIP_IMG
+    y = OLED_HEIGHT - 1 - y;
+    x = OLED_WIDTH - 1 - x;
+#endif
+   
+    if(x >= OLED_WIDTH || y >= OLED_HEIGHT) {
+        // Don't write outside the buffer
+        return;
+    }
+   
+    // Draw in the right color
+    if(color == White) {
+        oled_buffer[x + (y / 8) * OLED_WIDTH] |= 1 << (y % 8);
+    } else { 
+        oled_buffer[x + (y / 8) * OLED_WIDTH] &= ~(1 << (y % 8));
+    }
+}
+
+Oled_StringSize_t Oled_GetStringSize(char *str, const GFXfont_t *font)
+{
+    Oled_StringSize_t str_size = {0, 0};
+    int8_t y_offset = 0;
+    
+    while(*str)
+    {
+        if (*str < font->first || *str > font->last) 
+				{
+					str_size.width = 0;
+					str_size.height = 0;
+					return str_size;
+				}
+
+        GFXglyph_t *glyph = &font->glyph[*str - font->first];
+        
+        if(abs(glyph->height - abs(glyph->yOffset)))
+        { 
+            if(y_offset < abs(glyph->height - abs(glyph->yOffset))) y_offset = abs(glyph->height - abs(glyph->yOffset));
+        }
+        if(str_size.height < glyph->height) str_size.height = glyph->height;
+        str_size.width += glyph->xAdvance;
+        str++;
+    }
+    str_size.height += y_offset;
+    return str_size;
+}
+
+/*
+ * Draw 1 char to the screen buffer
+ * ch       => char om weg te schrijven
+ * Font     => Font waarmee we gaan schrijven
+ * color    => Black or White
+ */
+void Oled_WriteChar(char c, const GFXfont_t *font, Oled_Color_e color) {
+    if (c < font->first || c > font->last) return;
+
+    GFXglyph_t *glyph = &font->glyph[c - font->first];
+    uint8_t  *bitmap = font->bitmap;
+
+    uint16_t bo = glyph->bitmapOffset;
+    uint8_t  w  = glyph->width;
+    uint8_t  h  = glyph->height;
+    int8_t   xo = glyph->xOffset;
+    int8_t   yo = glyph->yOffset;
+
+    int16_t x = Oled.CurrentX;
+    int16_t y = Oled.CurrentY;
+
+    uint8_t bit = 0, bits = bitmap[bo];
+
+    for (uint8_t yy = 0; yy < h; yy++) {
+        for (uint8_t xx = 0; xx < w; xx++) {
+            if (bit >= 8) {
+                bits = bitmap[++bo];
+                bit  = 0;
+            }
+            if (bits & 0x80) {
+                uint8_t cx = x + xo + xx;
+                uint8_t cy = y + yo + yy;
+                
+            #ifdef FLIP_IMG
+                uint8_t tx = OLED_WIDTH - 1 - cx;
+                uint8_t ty = OLED_HEIGHT - 1 - cy;
+                
+            #else
+                uint8_t tx = cx;
+                uint8_t ty = cy;
+            #endif
+   
+                
+                // Toggle color
+                if(color == White && (oled_buffer[tx + (ty / 8) * OLED_WIDTH] & (1 << (ty % 8)))) 
+                {
+                    color = Black;
+                } 
+                else if(color == Black && !(oled_buffer[tx + (ty / 8) * OLED_WIDTH] & (1 << (ty % 8)))) 
+                {
+                    color = White;
+                }
+                Oled_DrawPixel(cx, cy, color);
+            }
+            bits <<= 1;
+            bit++;
+        }
+    }
+
+    // Tự động dịch con trỏ sang phải
+    Oled.CurrentX += glyph->xAdvance;
+}
+
+/* Write full string to screenbuffer */
+void Oled_WriteString(const char *str, const GFXfont_t *font, Oled_Color_e color) 
+{
+    while (*str) {
+        if (*str == '\n') 
+        {
+            Oled.CurrentY += font->yAdvance;
+            Oled.CurrentX  = 0;
+        } 
+        else if (*str >= font->first && *str <= font->last) 
+        {
+            Oled_WriteChar(*str, font, color);
+        }
+        str++;
+    }
+}
+
+
+Oled_Cursor_t Oled_GetCursor(void)
+{
+    Oled_Cursor_t cursor = {Oled.CurrentX, Oled.CurrentY};
+    return cursor;
+}
+
+/* Position the cursor */
+void Oled_SetCursor(uint8_t x, uint8_t y) 
+{
+    Oled.CurrentX = x;
+    Oled.CurrentY = y;
+}
+
+/* Draw line by Bresenhem's algorithm */
+void Oled_Line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, Oled_Color_e color) 
+{
+    int32_t deltaX = abs(x2 - x1);
+    int32_t deltaY = abs(y2 - y1);
+    int32_t signX = ((x1 < x2) ? 1 : -1);
+    int32_t signY = ((y1 < y2) ? 1 : -1);
+    int32_t error = deltaX - deltaY;
+    int32_t error2;
+    
+    Oled_DrawPixel(x2, y2, color);
+
+    while((x1 != x2) || (y1 != y2)) {
+        Oled_DrawPixel(x1, y1, color);
+        error2 = error * 2;
+        if(error2 > -deltaY) {
+            error -= deltaY;
+            x1 += signX;
+        }
+        
+        if(error2 < deltaX) {
+            error += deltaX;
+            y1 += signY;
+        }
+    }
+    return;
+}
+
+/* Draw a rectangle */
+void Oled_DrawRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, Oled_Color_e color) 
+{
+    Oled_Line(x1,y1,x2,y1,color);
+    Oled_Line(x2,y1,x2,y2,color);
+    Oled_Line(x2,y2,x1,y2,color);
+    Oled_Line(x1,y2,x1,y1,color);
+
+    return;
+}
+
+/* Draw a filled rectangle */
+void Oled_FillRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, Oled_Color_e color) 
+{
+    uint8_t x_start = ((x1<=x2) ? x1 : x2);
+    uint8_t x_end   = ((x1<=x2) ? x2 : x1);
+    uint8_t y_start = ((y1<=y2) ? y1 : y2);
+    uint8_t y_end   = ((y1<=y2) ? y2 : y1);
+
+    for (uint8_t y= y_start; (y<= y_end)&&(y<OLED_HEIGHT); y++) {
+        for (uint8_t x= x_start; (x<= x_end)&&(x<OLED_WIDTH); x++) {
+            Oled_DrawPixel(x, y, color);
+        }
+    }
+    return;
+}
