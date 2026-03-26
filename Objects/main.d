@@ -1,8 +1,13 @@
 ./objects/main.o: Resources\main\main.c Resources\main\all_header.h \
+  Resources\main\..\oled\oled.h \
+  D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\stddef.h \
+  D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\stdint.h \
+  Resources\main\..\oled\..\kernel_driver\oled_i2c.h \
+  D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\stdlib.h \
+  Resources\main\..\oled\..\kernel_driver\config.h \
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\Include\stm32f10x.h \
   RTE\_Target_1\RTE_Components.h \
   D:\Setup\Keilc\Pack\ARM\CMSIS\6.2.0\CMSIS\Core\Include\core_cm3.h \
-  D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\stdint.h \
   D:\Setup\Keilc\Pack\ARM\CMSIS\6.2.0\CMSIS\Core\Include\cmsis_version.h \
   D:\Setup\Keilc\Pack\ARM\CMSIS\6.2.0\CMSIS\Core\Include\cmsis_compiler.h \
   D:\Setup\Keilc\Pack\ARM\CMSIS\6.2.0\CMSIS\Core\Include\cmsis_armclang.h \
@@ -18,8 +23,4 @@
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\stm32f10x_rcc.h \
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\stm32f10x_usart.h \
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\misc.h \
-  Resources\main\..\oled\oled.h \
-  D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\stddef.h \
-  Resources\main\..\oled\..\kernel_driver\oled_i2c.h \
-  D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\stdlib.h \
   Resources\main\..\oled\oled_fonts.h

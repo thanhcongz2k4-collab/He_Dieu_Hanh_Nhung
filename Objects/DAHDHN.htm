@@ -3,11 +3,11 @@
 <title>Static Call Graph - [.\Objects\DAHDHN.axf]</title></head>
 <body><HR>
 <H1>Static Call Graph for image .\Objects\DAHDHN.axf</H1><HR>
-<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6140002: Last Updated: Thu Mar 26 11:46:23 2026
+<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6140002: Last Updated: Thu Mar 26 12:32:06 2026
 <BR><P>
 <H3>Maximum Stack Usage =        112 bytes + Unknown(Functions without stacksize, Cycles, Untraceable Function Pointers)</H3><H3>
 Call chain for Maximum Stack Depth:</H3>
-__rt_entry_main &rArr; main &rArr; Oled_Init &rArr; I2Cx_Init &rArr; I2C_Init &rArr; RCC_GetClocksFreq
+__rt_entry_main &rArr; main &rArr; Oled_Init &rArr; Oled_Open &rArr; I2C_Init &rArr; RCC_GetClocksFreq
 <P>
 <H3>
 Functions with no stack information
@@ -204,7 +204,7 @@ Global Symbols
 
 <P><STRONG><a name="[46]"></a>__rt_entry_main</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, __rtentry2.o(.ARM.Collect$$rtentry$$0000000D))
 <BR><BR>[Stack]<UL><LI>Max Depth = 112 + Unknown Stack Size
-<LI>Call Chain = __rt_entry_main &rArr; main &rArr; Oled_Init &rArr; I2Cx_Init &rArr; I2C_Init &rArr; RCC_GetClocksFreq
+<LI>Call Chain = __rt_entry_main &rArr; main &rArr; Oled_Init &rArr; Oled_Open &rArr; I2C_Init &rArr; RCC_GetClocksFreq
 </UL>
 <BR>[Calls]<UL><LI><a href="#[47]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 <LI><a href="#[48]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;exit
@@ -421,7 +421,7 @@ Global Symbols
 <P><STRONG><a name="[4f]"></a>__aeabi_memset4</STRONG> (Thumb, 16 bytes, Stack size 0 bytes, aeabi_memset4.o(.text))
 <BR><BR>[Calls]<UL><LI><a href="#[50]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_memset_w
 </UL>
-<BR>[Called By]<UL><LI><a href="#[5f]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Fill
+<BR>[Called By]<UL><LI><a href="#[5a]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Fill
 </UL>
 
 <P><STRONG><a name="[c0]"></a>__aeabi_memset8</STRONG> (Thumb, 0 bytes, Stack size 0 bytes, aeabi_memset4.o(.text), UNUSED)
@@ -487,19 +487,19 @@ Global Symbols
 
 <P><STRONG><a name="[cd]"></a>__semihosting_library_function</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, indicate_semi.o(.text), UNUSED)
 
-<P><STRONG><a name="[5b]"></a>GPIO_Init</STRONG> (Thumb, 176 bytes, Stack size 24 bytes, stm32f10x_gpio.o(.text.GPIO_Init))
+<P><STRONG><a name="[62]"></a>GPIO_Init</STRONG> (Thumb, 176 bytes, Stack size 24 bytes, stm32f10x_gpio.o(.text.GPIO_Init))
 <BR><BR>[Stack]<UL><LI>Max Depth = 24<LI>Call Chain = GPIO_Init
 </UL>
-<BR>[Called By]<UL><LI><a href="#[58]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2Cx_Init
+<BR>[Called By]<UL><LI><a href="#[5c]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Open
 </UL>
 
 <P><STRONG><a name="[68]"></a>I2C_CheckEvent</STRONG> (Thumb, 22 bytes, Stack size 0 bytes, stm32f10x_i2c.o(.text.I2C_CheckEvent))
 <BR><BR>[Called By]<UL><LI><a href="#[64]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteData
-<LI><a href="#[61]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
+<LI><a href="#[5d]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
 </UL>
 
-<P><STRONG><a name="[5c]"></a>I2C_Cmd</STRONG> (Thumb, 18 bytes, Stack size 0 bytes, stm32f10x_i2c.o(.text.I2C_Cmd))
-<BR><BR>[Called By]<UL><LI><a href="#[58]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2Cx_Init
+<P><STRONG><a name="[63]"></a>I2C_Cmd</STRONG> (Thumb, 18 bytes, Stack size 0 bytes, stm32f10x_i2c.o(.text.I2C_Cmd))
+<BR><BR>[Called By]<UL><LI><a href="#[5c]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Open
 </UL>
 
 <P><STRONG><a name="[54]"></a>I2C_DeInit</STRONG> (Thumb, 40 bytes, Stack size 8 bytes, stm32f10x_i2c.o(.text.I2C_DeInit))
@@ -507,24 +507,24 @@ Global Symbols
 </UL>
 <BR>[Calls]<UL><LI><a href="#[55]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;RCC_APB1PeriphResetCmd
 </UL>
-<BR>[Called By]<UL><LI><a href="#[58]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2Cx_Init
+<BR>[Called By]<UL><LI><a href="#[5c]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Open
 </UL>
 
 <P><STRONG><a name="[67]"></a>I2C_GenerateSTART</STRONG> (Thumb, 18 bytes, Stack size 0 bytes, stm32f10x_i2c.o(.text.I2C_GenerateSTART))
 <BR><BR>[Called By]<UL><LI><a href="#[64]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteData
-<LI><a href="#[61]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
+<LI><a href="#[5d]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
 </UL>
 
 <P><STRONG><a name="[6b]"></a>I2C_GenerateSTOP</STRONG> (Thumb, 18 bytes, Stack size 0 bytes, stm32f10x_i2c.o(.text.I2C_GenerateSTOP))
 <BR><BR>[Called By]<UL><LI><a href="#[64]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteData
-<LI><a href="#[61]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
+<LI><a href="#[5d]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
 </UL>
 
 <P><STRONG><a name="[66]"></a>I2C_GetFlagStatus</STRONG> (Thumb, 48 bytes, Stack size 8 bytes, stm32f10x_i2c.o(.text.I2C_GetFlagStatus))
 <BR><BR>[Stack]<UL><LI>Max Depth = 8<LI>Call Chain = I2C_GetFlagStatus
 </UL>
 <BR>[Called By]<UL><LI><a href="#[64]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteData
-<LI><a href="#[61]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
+<LI><a href="#[5d]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
 </UL>
 
 <P><STRONG><a name="[56]"></a>I2C_Init</STRONG> (Thumb, 204 bytes, Stack size 40 bytes, stm32f10x_i2c.o(.text.I2C_Init))
@@ -532,53 +532,40 @@ Global Symbols
 </UL>
 <BR>[Calls]<UL><LI><a href="#[57]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;RCC_GetClocksFreq
 </UL>
-<BR>[Called By]<UL><LI><a href="#[58]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2Cx_Init
+<BR>[Called By]<UL><LI><a href="#[5c]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Open
 </UL>
 
 <P><STRONG><a name="[69]"></a>I2C_Send7bitAddress</STRONG> (Thumb, 16 bytes, Stack size 0 bytes, stm32f10x_i2c.o(.text.I2C_Send7bitAddress))
 <BR><BR>[Called By]<UL><LI><a href="#[64]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteData
-<LI><a href="#[61]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
+<LI><a href="#[5d]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
 </UL>
 
 <P><STRONG><a name="[6a]"></a>I2C_SendData</STRONG> (Thumb, 4 bytes, Stack size 0 bytes, stm32f10x_i2c.o(.text.I2C_SendData))
 <BR><BR>[Called By]<UL><LI><a href="#[64]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteData
-<LI><a href="#[61]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
+<LI><a href="#[5d]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
 </UL>
 
-<P><STRONG><a name="[58]"></a>I2Cx_Init</STRONG> (Thumb, 110 bytes, Stack size 32 bytes, oled_i2c.o(.text.I2Cx_Init))
-<BR><BR>[Stack]<UL><LI>Max Depth = 80<LI>Call Chain = I2Cx_Init &rArr; I2C_Init &rArr; RCC_GetClocksFreq
-</UL>
-<BR>[Calls]<UL><LI><a href="#[59]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;RCC_APB2PeriphClockCmd
-<LI><a href="#[5a]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;RCC_APB1PeriphClockCmd
-<LI><a href="#[56]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2C_Init
-<LI><a href="#[54]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2C_DeInit
-<LI><a href="#[5c]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2C_Cmd
-<LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;GPIO_Init
-</UL>
-<BR>[Called By]<UL><LI><a href="#[60]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Init
-</UL>
-
-<P><STRONG><a name="[63]"></a>Oled_DrawPixel</STRONG> (Thumb, 58 bytes, Stack size 0 bytes, oled.o(.text.Oled_DrawPixel))
+<P><STRONG><a name="[5f]"></a>Oled_DrawPixel</STRONG> (Thumb, 58 bytes, Stack size 0 bytes, oled.o(.text.Oled_DrawPixel))
 <BR><BR>[Called By]<UL><LI><a href="#[65]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteChar
-<LI><a href="#[5e]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Line
+<LI><a href="#[59]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Line
 </UL>
 
-<P><STRONG><a name="[5d]"></a>Oled_DrawRectangle</STRONG> (Thumb, 82 bytes, Stack size 32 bytes, oled.o(.text.Oled_DrawRectangle))
+<P><STRONG><a name="[58]"></a>Oled_DrawRectangle</STRONG> (Thumb, 82 bytes, Stack size 32 bytes, oled.o(.text.Oled_DrawRectangle))
 <BR><BR>[Stack]<UL><LI>Max Depth = 80<LI>Call Chain = Oled_DrawRectangle &rArr; Oled_Line
 </UL>
-<BR>[Calls]<UL><LI><a href="#[5e]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Line
+<BR>[Calls]<UL><LI><a href="#[59]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Line
 </UL>
 <BR>[Called By]<UL><LI><a href="#[47]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[5f]"></a>Oled_Fill</STRONG> (Thumb, 28 bytes, Stack size 8 bytes, oled.o(.text.Oled_Fill))
+<P><STRONG><a name="[5a]"></a>Oled_Fill</STRONG> (Thumb, 28 bytes, Stack size 8 bytes, oled.o(.text.Oled_Fill))
 <BR><BR>[Stack]<UL><LI>Max Depth = 8 + Unknown Stack Size
 <LI>Call Chain = Oled_Fill
 </UL>
 <BR>[Calls]<UL><LI><a href="#[4f]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_memset4
 </UL>
 <BR>[Called By]<UL><LI><a href="#[47]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
-<LI><a href="#[60]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Init
+<LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Init
 </UL>
 
 <P><STRONG><a name="[78]"></a>Oled_GetStringSize</STRONG> (Thumb, 140 bytes, Stack size 24 bytes, oled.o(.text.Oled_GetStringSize))
@@ -587,49 +574,62 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[47]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[60]"></a>Oled_Init</STRONG> (Thumb, 242 bytes, Stack size 24 bytes, oled.o(.text.Oled_Init))
+<P><STRONG><a name="[5b]"></a>Oled_Init</STRONG> (Thumb, 242 bytes, Stack size 24 bytes, oled.o(.text.Oled_Init))
 <BR><BR>[Stack]<UL><LI>Max Depth = 104 + Unknown Stack Size
-<LI>Call Chain = Oled_Init &rArr; I2Cx_Init &rArr; I2C_Init &rArr; RCC_GetClocksFreq
+<LI>Call Chain = Oled_Init &rArr; Oled_Open &rArr; I2C_Init &rArr; RCC_GetClocksFreq
 </UL>
-<BR>[Calls]<UL><LI><a href="#[61]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
-<LI><a href="#[58]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2Cx_Init
-<LI><a href="#[62]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_UpdateScreen
-<LI><a href="#[5f]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Fill
+<BR>[Calls]<UL><LI><a href="#[5d]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
+<LI><a href="#[5c]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Open
+<LI><a href="#[5e]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_UpdateScreen
+<LI><a href="#[5a]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Fill
 </UL>
 <BR>[Called By]<UL><LI><a href="#[47]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[5e]"></a>Oled_Line</STRONG> (Thumb, 148 bytes, Stack size 48 bytes, oled.o(.text.Oled_Line))
+<P><STRONG><a name="[59]"></a>Oled_Line</STRONG> (Thumb, 148 bytes, Stack size 48 bytes, oled.o(.text.Oled_Line))
 <BR><BR>[Stack]<UL><LI>Max Depth = 48<LI>Call Chain = Oled_Line
 </UL>
-<BR>[Calls]<UL><LI><a href="#[63]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_DrawPixel
+<BR>[Calls]<UL><LI><a href="#[5f]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_DrawPixel
 </UL>
-<BR>[Called By]<UL><LI><a href="#[5d]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_DrawRectangle
+<BR>[Called By]<UL><LI><a href="#[58]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_DrawRectangle
+</UL>
+
+<P><STRONG><a name="[5c]"></a>Oled_Open</STRONG> (Thumb, 110 bytes, Stack size 32 bytes, oled_i2c.o(.text.Oled_Open))
+<BR><BR>[Stack]<UL><LI>Max Depth = 80<LI>Call Chain = Oled_Open &rArr; I2C_Init &rArr; RCC_GetClocksFreq
+</UL>
+<BR>[Calls]<UL><LI><a href="#[60]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;RCC_APB2PeriphClockCmd
+<LI><a href="#[61]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;RCC_APB1PeriphClockCmd
+<LI><a href="#[56]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2C_Init
+<LI><a href="#[54]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2C_DeInit
+<LI><a href="#[63]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2C_Cmd
+<LI><a href="#[62]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;GPIO_Init
+</UL>
+<BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Init
 </UL>
 
 <P><STRONG><a name="[79]"></a>Oled_SetCursor</STRONG> (Thumb, 22 bytes, Stack size 0 bytes, oled.o(.text.Oled_SetCursor))
 <BR><BR>[Called By]<UL><LI><a href="#[47]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[62]"></a>Oled_UpdateScreen</STRONG> (Thumb, 54 bytes, Stack size 16 bytes, oled.o(.text.Oled_UpdateScreen))
+<P><STRONG><a name="[5e]"></a>Oled_UpdateScreen</STRONG> (Thumb, 54 bytes, Stack size 16 bytes, oled.o(.text.Oled_UpdateScreen))
 <BR><BR>[Stack]<UL><LI>Max Depth = 56<LI>Call Chain = Oled_UpdateScreen &rArr; Oled_WriteData &rArr; I2C_GetFlagStatus
 </UL>
 <BR>[Calls]<UL><LI><a href="#[64]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteData
-<LI><a href="#[61]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
+<LI><a href="#[5d]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteCommand
 </UL>
 <BR>[Called By]<UL><LI><a href="#[47]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
-<LI><a href="#[60]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Init
+<LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Init
 </UL>
 
 <P><STRONG><a name="[65]"></a>Oled_WriteChar</STRONG> (Thumb, 300 bytes, Stack size 64 bytes, oled.o(.text.Oled_WriteChar))
 <BR><BR>[Stack]<UL><LI>Max Depth = 64<LI>Call Chain = Oled_WriteChar
 </UL>
-<BR>[Calls]<UL><LI><a href="#[63]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_DrawPixel
+<BR>[Calls]<UL><LI><a href="#[5f]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_DrawPixel
 </UL>
 <BR>[Called By]<UL><LI><a href="#[6c]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteString
 </UL>
 
-<P><STRONG><a name="[61]"></a>Oled_WriteCommand</STRONG> (Thumb, 208 bytes, Stack size 24 bytes, oled_i2c.o(.text.Oled_WriteCommand))
+<P><STRONG><a name="[5d]"></a>Oled_WriteCommand</STRONG> (Thumb, 208 bytes, Stack size 24 bytes, oled_i2c.o(.text.Oled_WriteCommand))
 <BR><BR>[Stack]<UL><LI>Max Depth = 32<LI>Call Chain = Oled_WriteCommand &rArr; I2C_GetFlagStatus
 </UL>
 <BR>[Calls]<UL><LI><a href="#[6a]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2C_SendData
@@ -639,8 +639,8 @@ Global Symbols
 <LI><a href="#[67]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2C_GenerateSTART
 <LI><a href="#[68]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2C_CheckEvent
 </UL>
-<BR>[Called By]<UL><LI><a href="#[62]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_UpdateScreen
-<LI><a href="#[60]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Init
+<BR>[Called By]<UL><LI><a href="#[5e]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_UpdateScreen
+<LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Init
 </UL>
 
 <P><STRONG><a name="[64]"></a>Oled_WriteData</STRONG> (Thumb, 232 bytes, Stack size 32 bytes, oled_i2c.o(.text.Oled_WriteData))
@@ -653,7 +653,7 @@ Global Symbols
 <LI><a href="#[67]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2C_GenerateSTART
 <LI><a href="#[68]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2C_CheckEvent
 </UL>
-<BR>[Called By]<UL><LI><a href="#[62]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_UpdateScreen
+<BR>[Called By]<UL><LI><a href="#[5e]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_UpdateScreen
 </UL>
 
 <P><STRONG><a name="[6c]"></a>Oled_WriteString</STRONG> (Thumb, 86 bytes, Stack size 32 bytes, oled.o(.text.Oled_WriteString))
@@ -671,16 +671,16 @@ Global Symbols
 </UL>
 <BR>[Address Reference Count : 1]<UL><LI> startup_stm32f10x_md.o(RESET)
 </UL>
-<P><STRONG><a name="[5a]"></a>RCC_APB1PeriphClockCmd</STRONG> (Thumb, 24 bytes, Stack size 0 bytes, stm32f10x_rcc.o(.text.RCC_APB1PeriphClockCmd))
-<BR><BR>[Called By]<UL><LI><a href="#[58]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2Cx_Init
+<P><STRONG><a name="[61]"></a>RCC_APB1PeriphClockCmd</STRONG> (Thumb, 24 bytes, Stack size 0 bytes, stm32f10x_rcc.o(.text.RCC_APB1PeriphClockCmd))
+<BR><BR>[Called By]<UL><LI><a href="#[5c]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Open
 </UL>
 
 <P><STRONG><a name="[55]"></a>RCC_APB1PeriphResetCmd</STRONG> (Thumb, 24 bytes, Stack size 0 bytes, stm32f10x_rcc.o(.text.RCC_APB1PeriphResetCmd))
 <BR><BR>[Called By]<UL><LI><a href="#[54]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2C_DeInit
 </UL>
 
-<P><STRONG><a name="[59]"></a>RCC_APB2PeriphClockCmd</STRONG> (Thumb, 24 bytes, Stack size 0 bytes, stm32f10x_rcc.o(.text.RCC_APB2PeriphClockCmd))
-<BR><BR>[Called By]<UL><LI><a href="#[58]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;I2Cx_Init
+<P><STRONG><a name="[60]"></a>RCC_APB2PeriphClockCmd</STRONG> (Thumb, 24 bytes, Stack size 0 bytes, stm32f10x_rcc.o(.text.RCC_APB2PeriphClockCmd))
+<BR><BR>[Called By]<UL><LI><a href="#[5c]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Open
 </UL>
 
 <P><STRONG><a name="[57]"></a>RCC_GetClocksFreq</STRONG> (Thumb, 160 bytes, Stack size 8 bytes, stm32f10x_rcc.o(.text.RCC_GetClocksFreq))
@@ -743,15 +743,15 @@ Global Symbols
 
 <P><STRONG><a name="[47]"></a>main</STRONG> (Thumb, 134 bytes, Stack size 8 bytes, main.o(.text.main))
 <BR><BR>[Stack]<UL><LI>Max Depth = 112 + Unknown Stack Size
-<LI>Call Chain = main &rArr; Oled_Init &rArr; I2Cx_Init &rArr; I2C_Init &rArr; RCC_GetClocksFreq
+<LI>Call Chain = main &rArr; Oled_Init &rArr; Oled_Open &rArr; I2C_Init &rArr; RCC_GetClocksFreq
 </UL>
 <BR>[Calls]<UL><LI><a href="#[6c]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_WriteString
-<LI><a href="#[62]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_UpdateScreen
+<LI><a href="#[5e]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_UpdateScreen
 <LI><a href="#[79]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_SetCursor
-<LI><a href="#[60]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Init
+<LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Init
 <LI><a href="#[78]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_GetStringSize
-<LI><a href="#[5f]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Fill
-<LI><a href="#[5d]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_DrawRectangle
+<LI><a href="#[5a]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_Fill
+<LI><a href="#[58]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Oled_DrawRectangle
 </UL>
 <BR>[Called By]<UL><LI><a href="#[46]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__rt_entry_main
 </UL>
