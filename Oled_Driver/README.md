@@ -246,226 +246,1003 @@ make
 
 ---
 
-## Bước 5 — VD sử dụng hàm write của driver oled1306
+## Bước 5 — Viết thư viện 
 
-`ssd1306.ko` đóng vai trò **thin driver** — chỉ nhận raw bytes từ user-space và forward xuống I2C. Toàn bộ logic hiển thị (init, clear, draw text, draw pixel, ...) nằm ở user-space.
 
-### Kiến trúc
+### Cấu trúc thư mục đề xuất oled-font
 
 ```
-oled_app.c          ← application: logic hiển thị, điều khiển nội dung
-     │  gọi hàm
-     ▼
-oled_lib.c/.h       ← library: đóng gói SSD1306 commands (init, draw, ...)
-     │  write()
-     ▼
-/dev/oled           ← char device (tạo bởi ssd1306.ko)
-     │
-ssd1306.ko          ← kernel module: forward bytes xuống I2C
-     │  i2c_smbus_write_byte()
-     ▼
-SSD1306 OLED Hardware
+package/oled-font/
+├── Config.in
+├── oled-font.mk
+└── src/
+    ├── oled-fonts.h
+    ├── oled-fonts.c
 ```
 
-
-
-### `oled_app.c`
+### `src/oled_fonts.h`
 
 ```c
-#include <stdio.h>
-#include <stdio.h>
+#ifndef __OLED_FONTS_H__
+#define __OLED_FONTS_H__
+
+#include <stdint.h>
+
+#define DEFAULT_FONT  Serif_plain_10
+
+typedef struct {
+  uint16_t bitmapOffset;
+  uint8_t  width;
+  uint8_t  height;
+  uint8_t  xAdvance;
+  int8_t   xOffset;
+  int8_t   yOffset;
+} GFXglyph_t;
+
+typedef struct {
+  uint8_t  *bitmap;
+  GFXglyph_t *glyph;
+  uint8_t   first;
+  uint8_t   last;
+  uint8_t   yAdvance;
+} GFXfont_t;
+
+extern const GFXfont_t Serif_plain_10;
+
+#endif
+
+```
+
+### `src/oled_fonts.c`
+
+```c
+
+#include "oled_fonts.h"
+
+#define PROGMEM  
+
+// Created by https://oleddisplay.squix.ch/ Consider a donation
+// In case of problems make sure that you are using the font file with the correct version!
+const uint8_t Serif_plain_10Bitmaps[] PROGMEM = {
+
+	// Bitmap Data:
+	0x00, // ' '
+	0xAA,0x88, // '!'
+	0xAA,0xA0, // '"'
+	0x24,0x28,0x7E,0x28,0xFC,0x50,0x50, // '#'
+	0x23,0xEA,0x1C,0x2A,0xA7,0x08, // '$'
+	0xE4,0x52,0x2A,0x1F,0xE1,0x51,0x28,0x9C, // '%'
+	0x30,0x24,0x10,0x16,0xE9,0xA4,0x61,0xEC, // '&'
+	0xA8, // '''
+	0x52,0x49,0x24,0x40, // '('
+	0x91,0x24,0x94,0x80, // ')'
+	0x22,0xA7,0x3E,0x20, // '*'
+	0x10,0x10,0x10,0xFE,0x10,0x10,0x10, // '+'
+	0x50, // ','
+	0xE0, // '-'
+	0x80, // '.'
+	0x22,0x44,0x44,0x88, // '/'
+	0x72,0x28,0xA2,0x8A,0x27,0x00, // '0'
+	0x4C,0x44,0x44,0xE0, // '1'
+	0x72,0x20,0x84,0x21,0x2F,0x80, // '2'
+	0x72,0x20,0x8C,0x0A,0x27,0x00, // '3'
+	0x10,0xC5,0x14,0xF8,0x43,0x80, // '4'
+	0xFA,0x0F,0x02,0x0A,0x27,0x00, // '5'
+	0x72,0x28,0x3C,0x8A,0x27,0x00, // '6'
+	0xFA,0x21,0x04,0x20,0x84,0x00, // '7'
+	0x72,0x28,0x9C,0xDA,0x27,0x00, // '8'
+	0x72,0x28,0x9E,0x0A,0x27,0x00, // '9'
+	0x82, // ':'
+	0x40,0x28, // ';'
+	0x04,0x73,0x03,0x80,0xC0, // '<'
+	0xFC,0x03,0xF0, // '='
+	0x80,0xE0,0x31,0xCC,0x00, // '>'
+	0xE0,0x84,0xC4,0x01,0x00, // '?'
+	0x1E,0x18,0x4D,0xAA,0x9A,0xA2,0xA8,0xAD,0xF1,0x80,0x3E,0x00, // '@'
+	0x10,0x30,0x28,0x28,0x7C,0x44,0xCE, // 'A'
+	0xF8,0x89,0x13,0xC4,0x48,0xBE,0x00, // 'B'
+	0x38,0x8A,0x04,0x08,0x08,0x9E,0x00, // 'C'
+	0xF8,0x44,0x42,0x42,0x42,0x44,0xF8, // 'D'
+	0xFC,0x89,0x03,0xC4,0x08,0xBF,0x00, // 'E'
+	0xFC,0x89,0x03,0xC4,0x08,0x38,0x00, // 'F'
+	0x3C,0x42,0x80,0x80,0x86,0x42,0x3C, // 'G'
+	0xE7,0x21,0x10,0x8F,0xC4,0x22,0x13,0x9C, // 'H'
+	0xE4,0x44,0x44,0xE0, // 'I'
+	0x71,0x08,0x42,0x10,0x94,0xC0, // 'J'
+	0xEC,0x48,0x50,0x60,0x50,0x48,0xE6, // 'K'
+	0xE0,0x81,0x02,0x04,0x08,0xBF,0x00, // 'L'
+	0xE3,0x98,0xC5,0x51,0x54,0x49,0x12,0x4E,0x38, // 'M'
+	0xC7,0x31,0x14,0x8B,0x44,0xE2,0x33,0x88, // 'N'
+	0x38,0x44,0x82,0x82,0x82,0x44,0x38, // 'O'
+	0xF8,0x89,0x13,0xC4,0x08,0x38,0x00, // 'P'
+	0x38,0x44,0x82,0x82,0x82,0x44,0x38,0x08,0x04, // 'Q'
+	0xF8,0x44,0x44,0x78,0x48,0x44,0xE2, // 'R'
+	0x72,0x28,0x1C,0x0A,0x27,0x00, // 'S'
+	0xFE,0x92,0x10,0x10,0x10,0x10,0x38, // 'T'
+	0xE7,0x21,0x10,0x88,0x44,0x22,0x10,0xF0, // 'U'
+	0xEE,0x44,0x44,0x28,0x28,0x10,0x10, // 'V'
+	0xED,0xC9,0x91,0x4A,0x29,0x43,0x30,0x42,0x08,0x40, // 'W'
+	0xEE,0x44,0x28,0x10,0x28,0x44,0xEE, // 'X'
+	0xEE,0x44,0x28,0x10,0x10,0x10,0x38, // 'Y'
+	0xFD,0x10,0x41,0x82,0x08,0xBF,0x00, // 'Z'
+	0xD2,0x49,0x24,0xC0, // '['
+	0x88,0x44,0x44,0x22, // '\'
+	0xC9,0x24,0x92,0xC0, // ']'
+	0x30,0x92,0x10, // '^'
+	0xF8, // '_'
+	0x88, // '`'
+	0x60,0x4F,0x24,0xF8, // 'a'
+	0xC1,0x04,0x1C,0x49,0x24,0xBC, // 'b'
+	0x72,0x28,0x20,0x78, // 'c'
+	0x30,0x41,0x1C,0x92,0x49,0x1E, // 'd'
+	0x72,0x2F,0xA0,0x78, // 'e'
+	0x72,0x11,0xC4,0x21,0x1C, // 'f'
+	0x7A,0x49,0x24,0x70,0x4E,0x00, // 'g'
+	0xC0,0x81,0x03,0xC4,0x89,0x12,0x76, // 'h'
+	0x40,0xC4,0x44,0xE0, // 'i'
+	0x20,0x62,0x22,0x22,0xE0, // 'j'
+	0xC0,0x81,0x02,0xC5,0x0E,0x12,0x76, // 'k'
+	0xC4,0x44,0x44,0x4E, // 'l'
+	0xFF,0x12,0x44,0x91,0x24,0xED,0x80, // 'm'
+	0xF8,0x91,0x22,0x4E,0xC0, // 'n'
+	0x72,0x28,0xA2,0x70, // 'o'
+	0xF1,0x24,0x92,0x71,0x0E,0x00, // 'p'
+	0x7A,0x49,0x24,0x70,0x43,0x80, // 'q'
+	0xF2,0x90,0x8E,0x00, // 'r'
+	0xF4,0x18,0x2F,0x00, // 's'
+	0x42,0x38,0x84,0x29,0xC0, // 't'
+	0xD8,0x91,0x22,0x47,0xC0, // 'u'
+	0xEC,0x91,0x21,0x83,0x00, // 'v'
+	0xD6,0x54,0x54,0x28,0x28, // 'w'
+	0xD9,0x42,0x14,0xD8, // 'x'
+	0xCC,0x91,0x21,0x83,0x04,0x30,0x00, // 'y'
+	0xFA,0x42,0x12,0xF8, // 'z'
+	0x31,0x08,0x4C,0x10,0x84,0x30, // '{'
+	0xAA,0xAA,0xA0, // '|'
+	0xE0,0x82,0x08,0x18,0x82,0x08,0xE0 // '}'
+};
+const GFXglyph_t Serif_plain_10Glyphs[] PROGMEM = {
+// bitmapOffset, width, height, xAdvance, xOffset, yOffset
+	  {     0,   2,   1,   4,    0,   -1 }, // ' '
+	  {     1,   2,   7,   5,    1,   -7 }, // '!'
+	  {     3,   4,   3,   6,    1,   -7 }, // '"'
+	  {     5,   8,   7,   9,    0,   -7 }, // '#'
+	  {    12,   6,   8,   7,    0,   -7 }, // '$'
+	  {    18,   9,   7,  11,    0,   -7 }, // '%'
+	  {    26,   9,   7,  10,    0,   -7 }, // '&'
+	  {    34,   2,   3,   4,    1,   -7 }, // '''
+	  {    35,   3,   9,   5,    0,   -8 }, // '('
+	  {    39,   3,   9,   5,    1,   -8 }, // ')'
+	  {    43,   6,   5,   6,    0,   -7 }, // '*'
+	  {    47,   8,   7,   9,    1,   -7 }, // '+'
+	  {    54,   3,   2,   4,    0,   -1 }, // ','
+	  {    55,   4,   1,   4,    0,   -3 }, // '-'
+	  {    56,   2,   1,   4,    1,   -1 }, // '.'
+	  {    57,   4,   8,   4,    0,   -7 }, // '/'
+	  {    61,   6,   7,   7,    0,   -7 }, // '0'
+	  {    67,   4,   7,   7,    1,   -7 }, // '1'
+	  {    71,   6,   7,   7,    0,   -7 }, // '2'
+	  {    77,   6,   7,   7,    0,   -7 }, // '3'
+	  {    83,   6,   7,   7,    0,   -7 }, // '4'
+	  {    89,   6,   7,   7,    0,   -7 }, // '5'
+	  {    95,   6,   7,   7,    0,   -7 }, // '6'
+	  {   101,   6,   7,   7,    0,   -7 }, // '7'
+	  {   107,   6,   7,   7,    0,   -7 }, // '8'
+	  {   113,   6,   7,   7,    0,   -7 }, // '9'
+	  {   119,   2,   4,   4,    1,   -4 }, // ':'
+	  {   120,   3,   5,   4,    0,   -4 }, // ';'
+	  {   122,   7,   5,   9,    0,   -6 }, // '<'
+	  {   127,   7,   3,   9,    0,   -5 }, // '='
+	  {   130,   7,   5,   9,    0,   -6 }, // '>'
+	  {   135,   5,   7,   6,    0,   -7 }, // '?'
+	  {   140,  10,   9,  11,    0,   -7 }, // '@'
+	  {   152,   8,   7,   8,    0,   -7 }, // 'A'
+	  {   159,   7,   7,   8,    0,   -7 }, // 'B'
+	  {   166,   7,   7,   8,    0,   -7 }, // 'C'
+	  {   173,   8,   7,   9,    0,   -7 }, // 'D'
+	  {   180,   7,   7,   8,    0,   -7 }, // 'E'
+	  {   187,   7,   7,   8,    0,   -7 }, // 'F'
+	  {   194,   8,   7,   9,    0,   -7 }, // 'G'
+	  {   201,   9,   7,  10,    0,   -7 }, // 'H'
+	  {   209,   4,   7,   5,    0,   -7 }, // 'I'
+	  {   213,   5,   9,   5,   -1,   -7 }, // 'J'
+	  {   219,   8,   7,   8,    0,   -7 }, // 'K'
+	  {   226,   7,   7,   8,    0,   -7 }, // 'L'
+	  {   233,  10,   7,  11,    0,   -7 }, // 'M'
+	  {   242,   9,   7,  10,    0,   -7 }, // 'N'
+	  {   250,   8,   7,   9,    0,   -7 }, // 'O'
+	  {   257,   7,   7,   8,    0,   -7 }, // 'P'
+	  {   264,   8,   9,   9,    0,   -7 }, // 'Q'
+	  {   273,   8,   7,   9,    0,   -7 }, // 'R'
+	  {   280,   6,   7,   7,    0,   -7 }, // 'S'
+	  {   286,   8,   7,   9,    0,   -7 }, // 'T'
+	  {   293,   9,   7,  10,    0,   -7 }, // 'U'
+	  {   301,   8,   7,   8,    0,   -7 }, // 'V'
+	  {   308,  11,   7,  12,    0,   -7 }, // 'W'
+	  {   318,   8,   7,   9,    0,   -7 }, // 'X'
+	  {   325,   8,   7,   8,    0,   -7 }, // 'Y'
+	  {   332,   7,   7,   8,    0,   -7 }, // 'Z'
+	  {   339,   3,   9,   5,    0,   -8 }, // '['
+	  {   343,   4,   8,   4,    0,   -7 }, // '\'
+	  {   347,   3,   9,   5,    1,   -8 }, // ']'
+	  {   351,   7,   3,   9,    1,   -7 }, // '^'
+	  {   354,   6,   1,   6,    0,    1 }, // '_'
+	  {   355,   3,   2,   6,    1,   -8 }, // '`'
+	  {   356,   6,   5,   6,    0,   -5 }, // 'a'
+	  {   360,   6,   8,   7,    0,   -8 }, // 'b'
+	  {   366,   6,   5,   7,    0,   -5 }, // 'c'
+	  {   370,   6,   8,   6,    0,   -8 }, // 'd'
+	  {   376,   6,   5,   7,    0,   -5 }, // 'e'
+	  {   380,   5,   8,   5,    0,   -8 }, // 'f'
+	  {   385,   6,   7,   6,    0,   -5 }, // 'g'
+	  {   391,   7,   8,   7,    0,   -8 }, // 'h'
+	  {   398,   4,   7,   4,    0,   -7 }, // 'i'
+	  {   402,   4,   9,   4,   -1,   -7 }, // 'j'
+	  {   407,   7,   8,   7,    0,   -8 }, // 'k'
+	  {   414,   4,   8,   4,    0,   -8 }, // 'l'
+	  {   418,  10,   5,  10,    0,   -5 }, // 'm'
+	  {   425,   7,   5,   7,    0,   -5 }, // 'n'
+	  {   430,   6,   5,   7,    0,   -5 }, // 'o'
+	  {   434,   6,   7,   7,    0,   -5 }, // 'p'
+	  {   440,   6,   7,   7,    0,   -5 }, // 'q'
+	  {   446,   5,   5,   6,    0,   -5 }, // 'r'
+	  {   450,   5,   5,   6,    0,   -5 }, // 's'
+	  {   454,   5,   7,   5,    0,   -7 }, // 't'
+	  {   459,   7,   5,   7,    0,   -5 }, // 'u'
+	  {   464,   7,   5,   7,    0,   -5 }, // 'v'
+	  {   469,   8,   5,  10,    0,   -5 }, // 'w'
+	  {   474,   6,   5,   7,    0,   -5 }, // 'x'
+	  {   478,   7,   7,   7,    0,   -5 }, // 'y'
+	  {   485,   6,   5,   6,    0,   -5 }, // 'z'
+	  {   489,   5,   9,   7,    1,   -8 }, // '{'
+	  {   495,   2,  10,   4,    1,   -8 }, // '|'
+	  {   498,   6,   9,   7,    1,   -8 } // '}'
+};
+const GFXfont_t Serif_plain_10 PROGMEM = {
+(uint8_t  *)Serif_plain_10Bitmaps,(GFXglyph_t *)Serif_plain_10Glyphs,0x20, 0x7E, 13};
+
+```
+
+### `package/oled_font/Config.in`
+
+```kconfig
+config BR2_PACKAGE_OLED_FONT
+    bool "oled-font"
+    help
+      Simple OLED font library (GFX style)
+```
+
+### `package/oled_font/oled_font.mk`
+
+```makefile
+OLED_FONT_VERSION = 1.0
+OLED_FONT_SITE = $(TOPDIR)/package/oled-font/src
+OLED_FONT_SITE_METHOD = local
+OLED_FONT_INSTALL_STAGING = YES
+
+define OLED_FONT_BUILD_CMDS
+	$(TARGET_CC) $(TARGET_CFLAGS) -fPIC -c $(@D)/oled_fonts.c -o $(@D)/oled_fonts.o
+	$(TARGET_AR) rcs $(@D)/liboledfont.a $(@D)/oled_fonts.o
+endef
+
+define OLED_FONT_INSTALL_STAGING_CMDS
+	$(INSTALL) -D -m 0644 $(@D)/liboledfont.a \
+		$(STAGING_DIR)/usr/lib/liboledfont.a
+
+	$(INSTALL) -D -m 0644 $(@D)/oled_fonts.h \
+		$(STAGING_DIR)/usr/include/oled_fonts.h
+endef
+
+define OLED_FONT_INSTALL_TARGET_CMDS
+	$(INSTALL) -D -m 0644 $(@D)/liboledfont.a \
+		$(TARGET_DIR)/usr/lib/liboledfont.a
+endef
+
+$(eval $(generic-package))
+
+```
+
+### Tích hợp vào Buildroot
+
+- Thêm `source "package/oled-font/Config.in"` vào `package/Config.in`.
+- Chọn `Target packages -> oled-font` trong `make menuconfig`.
+- `make` để build và cài.
+
+---
+
+### Cấu trúc thư mục đề xuất oled_i2c
+
+```
+package/oled_i2c/
+├── Config.in
+├── oled_i2c.mk
+└── src/
+    ├── oled_i2c.h
+    ├── oled_i2c.c
+```
+
+### `src/oled_i2c.h`
+
+```c
+#ifndef __OLED_I2C_H__
+#define __OLED_I2C_H__
+
+#include <stdint.h>
+#include <stddef.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#if defined(TEST_STM32)
+
+#include "stm32f10x.h"
+
+#define OLED_I2C_PORT        I2C2
+#define OLED_I2C_ADDR        (0x3C << 1)
+
+#else
+
 #include <fcntl.h>
 #include <unistd.h>
-#include <stdint.h>
-#include <string.h>
 
-// Font 5x7 cơ bản (chỉ chứa chữ cần dùng A-Z, space)
-static const uint8_t font5x7[][5] = {
-    [' '] = {0x00, 0x00, 0x00, 0x00, 0x00},
-    ['A'] = {0x7E, 0x11, 0x11, 0x11, 0x7E},
-    ['B'] = {0x7F, 0x49, 0x49, 0x49, 0x36},
-    ['C'] = {0x3E, 0x41, 0x41, 0x41, 0x22},
-    ['D'] = {0x7F, 0x41, 0x41, 0x22, 0x1C},
-    ['E'] = {0x7F, 0x49, 0x49, 0x49, 0x41},
-    ['F'] = {0x7F, 0x09, 0x09, 0x09, 0x01},
-    ['G'] = {0x3E, 0x41, 0x49, 0x49, 0x7A},
-    ['H'] = {0x7F, 0x08, 0x08, 0x08, 0x7F},
-    ['I'] = {0x00, 0x41, 0x7F, 0x41, 0x00},
-    ['J'] = {0x20, 0x40, 0x41, 0x3F, 0x01},
-    ['K'] = {0x7F, 0x08, 0x14, 0x22, 0x41},
-    ['L'] = {0x7F, 0x40, 0x40, 0x40, 0x40},
-    ['M'] = {0x7F, 0x02, 0x0C, 0x02, 0x7F},
-    ['N'] = {0x7F, 0x04, 0x08, 0x10, 0x7F},
-    ['O'] = {0x3E, 0x41, 0x41, 0x41, 0x3E},
-    ['P'] = {0x7F, 0x09, 0x09, 0x09, 0x06},
-    ['Q'] = {0x3E, 0x41, 0x51, 0x21, 0x5E},
-    ['R'] = {0x7F, 0x09, 0x19, 0x29, 0x46},
-    ['S'] = {0x46, 0x49, 0x49, 0x49, 0x31},
-    ['T'] = {0x01, 0x01, 0x7F, 0x01, 0x01},
-    ['U'] = {0x3F, 0x40, 0x40, 0x40, 0x3F},
-    ['V'] = {0x1F, 0x20, 0x40, 0x20, 0x1F},
-    ['W'] = {0x3F, 0x40, 0x38, 0x40, 0x3F},
-    ['X'] = {0x63, 0x14, 0x08, 0x14, 0x63},
-    ['Y'] = {0x07, 0x08, 0x70, 0x08, 0x07},
-    ['Z'] = {0x61, 0x51, 0x49, 0x45, 0x43},
-    ['a'] = {0x20, 0x54, 0x54, 0x54, 0x78},
-    ['b'] = {0x7F, 0x48, 0x44, 0x44, 0x38},
-    ['c'] = {0x38, 0x44, 0x44, 0x44, 0x20},
-    ['d'] = {0x38, 0x44, 0x44, 0x48, 0x7F},
-    ['e'] = {0x38, 0x54, 0x54, 0x54, 0x18},
-    ['f'] = {0x08, 0x7E, 0x09, 0x01, 0x02},
-    ['g'] = {0x0C, 0x52, 0x52, 0x52, 0x3E},
-    ['h'] = {0x7F, 0x08, 0x04, 0x04, 0x78},
-    ['i'] = {0x00, 0x44, 0x7D, 0x40, 0x00},
-    ['j'] = {0x20, 0x40, 0x44, 0x3D, 0x00},
-    ['k'] = {0x7F, 0x10, 0x28, 0x44, 0x00},
-    ['l'] = {0x00, 0x41, 0x7F, 0x40, 0x00},
-    ['m'] = {0x7C, 0x04, 0x18, 0x04, 0x78},
-    ['n'] = {0x7C, 0x08, 0x04, 0x04, 0x78},
-    ['o'] = {0x38, 0x44, 0x44, 0x44, 0x38},
-    ['p'] = {0x7C, 0x14, 0x14, 0x14, 0x08},
-    ['q'] = {0x08, 0x14, 0x14, 0x18, 0x7C},
-    ['r'] = {0x7C, 0x08, 0x04, 0x04, 0x08},
-    ['s'] = {0x48, 0x54, 0x54, 0x54, 0x20},
-    ['t'] = {0x04, 0x3F, 0x44, 0x40, 0x20},
-    ['u'] = {0x3C, 0x40, 0x40, 0x20, 0x7C},
-    ['v'] = {0x1C, 0x20, 0x40, 0x20, 0x1C},
-    ['w'] = {0x3C, 0x40, 0x30, 0x40, 0x3C},
-    ['x'] = {0x44, 0x28, 0x10, 0x28, 0x44},
-    ['y'] = {0x0C, 0x50, 0x50, 0x50, 0x3C},
-    ['z'] = {0x44, 0x64, 0x54, 0x4C, 0x44},
-};
+#define OLED_DEVICE "/dev/oled"
 
-int oled_write(int fd, uint8_t mode, uint8_t byte) {
-    uint8_t buf[2];
-    buf[0] = mode ? 0x40 : 0x00;
-    buf[1] = byte;
-    if (write(fd, buf, 2) != 2) {
-        perror("write");
-        return -1;
+#endif
+
+void Oled_Open(void);
+void Oled_WriteCommand(uint8_t cmd);
+void Oled_WriteData(uint8_t* buffer, size_t buff_size);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
+
+
+```
+
+### `src/oled_i2c.c`
+
+```c
+#include "oled_i2c.h"
+
+#if defined(TEST_STM32)
+
+#define OLED_TIMEOUT 10000
+
+static int IIC_OLED_TIMEOUT = 0;
+
+#define WAIT_FLAG(FLAG)                          \
+    do {                                         \
+        IIC_OLED_TIMEOUT = OLED_TIMEOUT;         \
+        while ((FLAG) && (IIC_OLED_TIMEOUT--));  \
+        if (IIC_OLED_TIMEOUT <= 0) return;       \
+    } while (0)
+
+void Oled_Open(void) 
+{
+    GPIO_InitTypeDef GPIO_InitStruct;
+    I2C_InitTypeDef I2C_InitStruct;
+
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
+
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C2, ENABLE);
+
+    GPIO_InitStruct.GPIO_Pin = GPIO_Pin_10 | GPIO_Pin_11;
+    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AF_OD;
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    I2C_DeInit(OLED_I2C_PORT);
+
+    I2C_InitStruct.I2C_ClockSpeed = 400000;
+    I2C_InitStruct.I2C_Mode = I2C_Mode_I2C;
+    I2C_InitStruct.I2C_DutyCycle = I2C_DutyCycle_2;
+    I2C_InitStruct.I2C_Ack = I2C_Ack_Disable;
+    I2C_InitStruct.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
+
+    I2C_Init(OLED_I2C_PORT, &I2C_InitStruct);
+    I2C_Cmd(OLED_I2C_PORT, ENABLE);
+}
+
+void Oled_WriteCommand(uint8_t cmd) 
+{
+    while (I2C_GetFlagStatus(OLED_I2C_PORT, I2C_FLAG_BUSY));
+
+    I2C_GenerateSTART(OLED_I2C_PORT, ENABLE);
+    WAIT_FLAG(!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_MODE_SELECT));
+
+    I2C_Send7bitAddress(OLED_I2C_PORT, OLED_I2C_ADDR, I2C_Direction_Transmitter);
+    WAIT_FLAG(!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));
+
+    I2C_SendData(OLED_I2C_PORT, 0x00);
+    WAIT_FLAG(!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_BYTE_TRANSMITTING));
+
+    I2C_SendData(OLED_I2C_PORT, cmd);
+    WAIT_FLAG(!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_BYTE_TRANSMITTING));
+
+    I2C_GenerateSTOP(OLED_I2C_PORT, ENABLE);
+}
+
+void Oled_WriteData(uint8_t* buffer, size_t buff_size) 
+{
+    while (I2C_GetFlagStatus(OLED_I2C_PORT, I2C_FLAG_BUSY));
+
+    I2C_GenerateSTART(OLED_I2C_PORT, ENABLE);
+    WAIT_FLAG(!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_MODE_SELECT));
+
+    I2C_Send7bitAddress(OLED_I2C_PORT, OLED_I2C_ADDR, I2C_Direction_Transmitter);
+    WAIT_FLAG(!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));
+
+    I2C_SendData(OLED_I2C_PORT, 0x40);
+    WAIT_FLAG(!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_BYTE_TRANSMITTING));
+
+    for (size_t i = 0; i < buff_size; i++) {
+        I2C_SendData(OLED_I2C_PORT, buffer[i]);
+        WAIT_FLAG(!I2C_CheckEvent(OLED_I2C_PORT, I2C_EVENT_MASTER_BYTE_TRANSMITTING));
     }
-    return 0;
+
+    I2C_GenerateSTOP(OLED_I2C_PORT, ENABLE);
 }
 
-void oled_init(int fd) {
-    oled_write(fd, 0, 0xAE);
-    oled_write(fd, 0, 0xD5);
-    oled_write(fd, 0, 0x80);
-    oled_write(fd, 0, 0xA8);
-    oled_write(fd, 0, 0x3F);
-    oled_write(fd, 0, 0xD3);
-    oled_write(fd, 0, 0x00);
-    oled_write(fd, 0, 0x40);
-    oled_write(fd, 0, 0x8D);
-    oled_write(fd, 0, 0x14);
-    oled_write(fd, 0, 0x20);
-    oled_write(fd, 0, 0x00);
-    oled_write(fd, 0, 0xA1);
-    oled_write(fd, 0, 0xC8);
-    oled_write(fd, 0, 0xDA);
-    oled_write(fd, 0, 0x12);
-    oled_write(fd, 0, 0x81);
-    oled_write(fd, 0, 0x7F);
-    oled_write(fd, 0, 0xD9);
-    oled_write(fd, 0, 0xF1);
-    oled_write(fd, 0, 0xDB);
-    oled_write(fd, 0, 0x40);
-    oled_write(fd, 0, 0xA4);
-    oled_write(fd, 0, 0xA6);
-    oled_write(fd, 0, 0xAF);
+#else
+
+#include <stdio.h>
+
+static int fd = -1;
+
+void Oled_Open(void) 
+{
+    fd = open(OLED_DEVICE, O_WRONLY);
+    if (fd < 0) {
+        perror("open oled");
+    }
 }
 
-void oled_clear(int fd) {
-    for (int page = 0; page < 8; page++) {
-        oled_write(fd, 0, 0xB0 + page);
-        oled_write(fd, 0, 0x00);
-        oled_write(fd, 0, 0x10);
-        for (int col = 0; col < 128; col++) {
-            oled_write(fd, 1, 0x00);
+void Oled_WriteCommand(uint8_t cmd) 
+{
+    if (fd < 0) return;
+
+    uint8_t buf[2] = {0x00, cmd};
+    if (write(fd, buf, 2) < 0) {
+        perror("write command");
+    }
+}
+
+void Oled_WriteData(uint8_t* buffer, size_t buff_size) 
+{
+    if (fd < 0) return;
+
+    uint8_t tmp[buff_size + 1];
+    tmp[0] = 0x40;
+
+    for (size_t i = 0; i < buff_size; i++) {
+        tmp[i + 1] = buffer[i];
+    }
+
+    if (write(fd, tmp, buff_size + 1) < 0) {
+        perror("write data");
+    }
+}
+
+#endif
+
+```
+
+### `package/oled_i2c/Config.in`
+
+```kconfig
+config BR2_PACKAGE_OLED_I2C
+    bool "oled_i2c"
+    help
+      Simple OLED SSD1306 library for Linux and STM32
+
+```
+
+### `package/oled_i2c/oled_i2c.mk`
+
+```makefile
+OLED_I2C_VERSION = 1.0
+OLED_I2C_SITE = $(TOPDIR)/package/oled_i2c/src
+OLED_I2C_SITE_METHOD = local
+OLED_I2C_INSTALL_STAGING = YES
+define OLED_I2C_BUILD_CMDS
+	$(TARGET_CC) $(TARGET_CFLAGS) -fPIC -c $(@D)/oled_i2c.c -o $(@D)/oled_i2c.o
+	$(TARGET_AR) rcs $(@D)/liboled.a $(@D)/oled_i2c.o
+	$(TARGET_CC) -shared -o $(@D)/liboled.so $(@D)/oled_i2c.o
+endef
+
+define OLED_I2C_INSTALL_STAGING_CMDS
+	$(INSTALL) -D -m 0644 $(@D)/liboled.a \
+		$(STAGING_DIR)/usr/lib/liboled.a
+
+	$(INSTALL) -D -m 0755 $(@D)/liboled.so \
+		$(STAGING_DIR)/usr/lib/liboled.so
+
+	$(INSTALL) -D -m 0644 $(@D)/oled_i2c.h \
+		$(STAGING_DIR)/usr/include/oled_i2c.h
+endef
+
+define OLED_I2C_INSTALL_TARGET_CMDS
+	$(INSTALL) -D -m 0755 $(@D)/liboled.so \
+		$(TARGET_DIR)/usr/lib/liboled.so
+endef
+
+$(eval $(generic-package))
+
+
+```
+
+### Tích hợp vào Buildroot
+
+- Thêm `source "package/oled_i2c/Config.in"` vào `package/Config.in`.
+- Chọn `Target packages -> oled_i2c` trong `make menuconfig`.
+- `make` để build và cài.
+
+---
+
+### Cấu trúc thư mục đề xuất oled
+
+```
+package/oled/
+├── Config.in
+├── oled.mk
+└── src/
+    ├── oled.h
+    ├── oled.c
+```
+
+### `src/oled.h`
+
+```c
+#ifndef __OLED_H__
+#define __OLED_H__
+
+#include <stddef.h>
+#include <stdint.h>
+
+// Sử dụng SPL cho STM32F103
+#include "oled_i2c.h"
+#include "oled_fonts.h"
+
+// #define FLIP_IMG
+
+#define OLED_INCLUDE_FONT_11x18
+
+#ifdef OLED_X_OFFSET
+#define OLED_X_OFFSET_LOWER (OLED_X_OFFSET & 0x0F)
+#define OLED_X_OFFSET_UPPER ((OLED_X_OFFSET >> 4) & 0x07)
+#else
+#define OLED_X_OFFSET_LOWER 0x00
+#define OLED_X_OFFSET_UPPER 0x00
+#endif
+
+// SSD1306 OLED height in pixels
+#ifndef OLED_HEIGHT
+#define OLED_HEIGHT          32
+#endif
+
+// SSD1306 width in pixels
+#ifndef OLED_WIDTH
+#define OLED_WIDTH           128
+#endif
+
+#ifndef OLED_BUFFER_SIZE
+#define OLED_BUFFER_SIZE   (OLED_WIDTH * OLED_HEIGHT / 8)
+#endif
+
+// Enumeration for screen colors
+typedef enum {
+    Black = 0x00, // Black color, no pixel
+    White = 0x01  // Pixel is set. Color depends on OLED
+} Oled_Color_e;
+
+// Struct to store transformations
+typedef struct {
+    uint16_t CurrentX;
+    uint16_t CurrentY;
+    uint8_t Initialized;
+    uint8_t DisplayOn;
+} Oled_t;
+
+typedef struct {
+    uint8_t x;
+    uint8_t y;
+} Oled_Cursor_t;
+
+typedef struct{
+  uint8_t width;
+  uint8_t height;
+} Oled_StringSize_t;
+
+// Procedure definitions
+void Oled_Init(void);
+void Oled_UpdateScreen(void);
+
+void Oled_Fill(Oled_Color_e color);
+Oled_Cursor_t Oled_GetCursor(void);
+void Oled_SetCursor(uint8_t x, uint8_t y);
+void Oled_DrawPixel(uint8_t x, uint8_t y, Oled_Color_e color);
+Oled_StringSize_t Oled_GetStringSize(char *str, const GFXfont_t *font);
+void Oled_WriteChar(char c, const GFXfont_t *font, Oled_Color_e color);
+void Oled_WriteString(const char *str, const GFXfont_t *font, Oled_Color_e color);
+void Oled_Line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, Oled_Color_e color);
+void Oled_DrawRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, Oled_Color_e color);
+void Oled_FillRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, Oled_Color_e color);
+
+#endif
+
+
+```
+
+### `src/oled.c`
+
+```c
+#include "oled.h"
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>  // For memcpy
+#include <math.h>
+
+// Screenbuffer
+static uint8_t oled_buffer[OLED_BUFFER_SIZE];
+
+// Screen object
+static Oled_t Oled;
+
+/* Initialize the oled screen */
+void Oled_Init(void) 
+{
+    uint8_t mux_ratio = 0x3F;
+    uint8_t com_pins_cfg = 0x12;
+
+    if (OLED_HEIGHT == 32) {
+        mux_ratio = 0x1F;
+        com_pins_cfg = 0x02;
+    }
+
+    Oled_Open();
+    for(volatile int i=0; i<0xfffff; i++);
+
+    Oled_WriteCommand(0xAE);
+    Oled_WriteCommand(0x20); // memory addressing mode
+    Oled_WriteCommand(0x00); // horizontal
+    Oled_WriteCommand(0xB0);
+    Oled_WriteCommand(0xC8);
+    Oled_WriteCommand(0x00);
+    Oled_WriteCommand(0x10);
+    Oled_WriteCommand(0x40);
+    Oled_WriteCommand(0x81);
+    Oled_WriteCommand(0x7F);
+    Oled_WriteCommand(0xA1);
+    Oled_WriteCommand(0xA6);
+    Oled_WriteCommand(0xA8);
+    Oled_WriteCommand(mux_ratio);
+    Oled_WriteCommand(0xA4);
+    Oled_WriteCommand(0xD3);
+    Oled_WriteCommand(0x00);
+    Oled_WriteCommand(0xD5);
+    Oled_WriteCommand(0x80);
+    Oled_WriteCommand(0xD9);
+    Oled_WriteCommand(0xF1);
+    Oled_WriteCommand(0xDA);
+    Oled_WriteCommand(com_pins_cfg);
+    Oled_WriteCommand(0xDB);
+    Oled_WriteCommand(0x40);
+    Oled_WriteCommand(0x8D);
+    Oled_WriteCommand(0x14);
+    Oled_WriteCommand(0xAF);
+    
+    // Clear screen
+    Oled_Fill(Black);
+    
+    // Flush buffer to screen
+    Oled_UpdateScreen();
+    
+    // Set default values for screen object
+    Oled.CurrentX = 0;
+    Oled.CurrentY = 0;
+    
+    Oled.Initialized = 1;
+}
+
+/* Fill the whole screen with the given color */
+void Oled_Fill(Oled_Color_e color) 
+{
+    memset(oled_buffer, (color == Black) ? 0x00 : 0xFF, sizeof(oled_buffer));
+}
+
+/* Write the screenbuffer with changed to the screen */
+void Oled_UpdateScreen(void) 
+{
+    // Write data to each page of RAM. Number of pages
+    // depends on the screen height:
+    //
+    //  * 32px   ==  4 pages
+    //  * 64px   ==  8 pages
+    //  * 128px  ==  16 pages
+    for(uint8_t page = 0; page < OLED_HEIGHT/8; page++) 
+    {
+        Oled_WriteCommand(0xB0 + page); // Set page address
+        Oled_WriteCommand(0x00 + OLED_X_OFFSET_LOWER); // Set lower column address
+        Oled_WriteCommand(0x10 + OLED_X_OFFSET_UPPER); // Set higher column address
+        Oled_WriteData(&oled_buffer[OLED_WIDTH*page], OLED_WIDTH);
+    }
+}
+
+/*
+ * Draw one pixel in the screenbuffer
+ * X => X Coordinate
+ * Y => Y Coordinate
+ * color => Pixel color
+ */
+void Oled_DrawPixel(uint8_t x, uint8_t y, Oled_Color_e color) 
+{
+    
+#ifdef FLIP_IMG
+    y = OLED_HEIGHT - 1 - y;
+    x = OLED_WIDTH - 1 - x;
+#endif
+   
+    if(x >= OLED_WIDTH || y >= OLED_HEIGHT) {
+        // Don't write outside the buffer
+        return;
+    }
+   
+    // Draw in the right color
+    if(color == White) {
+        oled_buffer[x + (y / 8) * OLED_WIDTH] |= 1 << (y % 8);
+    } else { 
+        oled_buffer[x + (y / 8) * OLED_WIDTH] &= ~(1 << (y % 8));
+    }
+}
+
+Oled_StringSize_t Oled_GetStringSize(char *str, const GFXfont_t *font)
+{
+    Oled_StringSize_t str_size = {0, 0};
+    int8_t y_offset = 0;
+    
+    while(*str)
+    {
+        if (*str < font->first || *str > font->last) 
+				{
+					str_size.width = 0;
+					str_size.height = 0;
+					return str_size;
+				}
+
+        GFXglyph_t *glyph = &font->glyph[*str - font->first];
+        
+        if(abs(glyph->height - abs(glyph->yOffset)))
+        { 
+            if(y_offset < abs(glyph->height - abs(glyph->yOffset))) y_offset = abs(glyph->height - abs(glyph->yOffset));
+        }
+        if(str_size.height < glyph->height) str_size.height = glyph->height;
+        str_size.width += glyph->xAdvance;
+        str++;
+    }
+    str_size.height += y_offset;
+    return str_size;
+}
+
+/*
+ * Draw 1 char to the screen buffer
+ * ch       => char om weg te schrijven
+ * Font     => Font waarmee we gaan schrijven
+ * color    => Black or White
+ */
+void Oled_WriteChar(char c, const GFXfont_t *font, Oled_Color_e color) {
+    if (c < font->first || c > font->last) return;
+
+    GFXglyph_t *glyph = &font->glyph[c - font->first];
+    uint8_t  *bitmap = font->bitmap;
+
+    uint16_t bo = glyph->bitmapOffset;
+    uint8_t  w  = glyph->width;
+    uint8_t  h  = glyph->height;
+    int8_t   xo = glyph->xOffset;
+    int8_t   yo = glyph->yOffset;
+
+    int16_t x = Oled.CurrentX;
+    int16_t y = Oled.CurrentY;
+
+    uint8_t bit = 0, bits = bitmap[bo];
+
+    for (uint8_t yy = 0; yy < h; yy++) {
+        for (uint8_t xx = 0; xx < w; xx++) {
+            if (bit >= 8) {
+                bits = bitmap[++bo];
+                bit  = 0;
+            }
+            if (bits & 0x80) {
+                uint8_t cx = x + xo + xx;
+                uint8_t cy = y + yo + yy;
+                
+            #ifdef FLIP_IMG
+                uint8_t tx = OLED_WIDTH - 1 - cx;
+                uint8_t ty = OLED_HEIGHT - 1 - cy;
+                
+            #else
+                uint8_t tx = cx;
+                uint8_t ty = cy;
+            #endif
+   
+                
+                // Toggle color
+                if(color == White && (oled_buffer[tx + (ty / 8) * OLED_WIDTH] & (1 << (ty % 8)))) 
+                {
+                    color = Black;
+                } 
+                else if(color == Black && !(oled_buffer[tx + (ty / 8) * OLED_WIDTH] & (1 << (ty % 8)))) 
+                {
+                    color = White;
+                }
+                Oled_DrawPixel(cx, cy, color);
+            }
+            bits <<= 1;
+            bit++;
         }
     }
+
+    // Tự động dịch con trỏ sang phải
+    Oled.CurrentX += glyph->xAdvance;
 }
 
-// Vẽ 1 ký tự tại page và cột x
-void oled_draw_char(int fd, uint8_t page, uint8_t x, char c) {
-    // Giới hạn index font
-    if (c < ' ' || c > 'z') c = ' ';
-
-    // Set vị trí
-    oled_write(fd, 0, 0xB0 + page);         // page
-    oled_write(fd, 0, (x & 0x0F));          // column low
-    oled_write(fd, 0, 0x10 | (x >> 4));     // column high
-
-    // Gửi 5 cột pixel của ký tự
-    for (int i = 0; i < 5; i++) {
-        oled_write(fd, 1, font5x7[(uint8_t)c][i]);
-    }
-    // 1 cột trống để cách chữ
-    oled_write(fd, 1, 0x00);
-}
-
-// Vẽ chuỗi tại page, bắt đầu từ cột x
-void oled_draw_string(int fd, uint8_t page, uint8_t x, const char *str) {
+/* Write full string to screenbuffer */
+void Oled_WriteString(const char *str, const GFXfont_t *font, Oled_Color_e color) 
+{
     while (*str) {
-        oled_draw_char(fd, page, x, *str++);
-        x += 6; // 5 pixel chữ + 1 pixel cách
-        if (x >= 128) break;
+        if (*str == '\n') 
+        {
+            Oled.CurrentY += font->yAdvance;
+            Oled.CurrentX  = 0;
+        } 
+        else if (*str >= font->first && *str <= font->last) 
+        {
+            Oled_WriteChar(*str, font, color);
+        }
+        str++;
     }
 }
 
-int main() {
-    int fd = open("/dev/oled", O_RDWR);
-    if (fd < 0) {
-        perror("open /dev/oled");
-        return 1;
-    }
 
-    oled_init(fd);
-    oled_clear(fd);
-    oled_draw_string(fd, 3, 10, "Hello Rimuru");
-
-    close(fd);
-    return 0;
+Oled_Cursor_t Oled_GetCursor(void)
+{
+    Oled_Cursor_t cursor = {Oled.CurrentX, Oled.CurrentY};
+    return cursor;
 }
+
+/* Position the cursor */
+void Oled_SetCursor(uint8_t x, uint8_t y) 
+{
+    Oled.CurrentX = x;
+    Oled.CurrentY = y;
+}
+
+/* Draw line by Bresenhem's algorithm */
+void Oled_Line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, Oled_Color_e color) 
+{
+    int32_t deltaX = abs(x2 - x1);
+    int32_t deltaY = abs(y2 - y1);
+    int32_t signX = ((x1 < x2) ? 1 : -1);
+    int32_t signY = ((y1 < y2) ? 1 : -1);
+    int32_t error = deltaX - deltaY;
+    int32_t error2;
+    
+    Oled_DrawPixel(x2, y2, color);
+
+    while((x1 != x2) || (y1 != y2)) {
+        Oled_DrawPixel(x1, y1, color);
+        error2 = error * 2;
+        if(error2 > -deltaY) {
+            error -= deltaY;
+            x1 += signX;
+        }
+        
+        if(error2 < deltaX) {
+            error += deltaX;
+            y1 += signY;
+        }
+    }
+    return;
+}
+
+/* Draw a rectangle */
+void Oled_DrawRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, Oled_Color_e color) 
+{
+    Oled_Line(x1,y1,x2,y1,color);
+    Oled_Line(x2,y1,x2,y2,color);
+    Oled_Line(x2,y2,x1,y2,color);
+    Oled_Line(x1,y2,x1,y1,color);
+
+    return;
+}
+
+/* Draw a filled rectangle */
+void Oled_FillRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, Oled_Color_e color) 
+{
+    uint8_t x_start = ((x1<=x2) ? x1 : x2);
+    uint8_t x_end   = ((x1<=x2) ? x2 : x1);
+    uint8_t y_start = ((y1<=y2) ? y1 : y2);
+    uint8_t y_end   = ((y1<=y2) ? y2 : y1);
+
+    for (uint8_t y= y_start; (y<= y_end)&&(y<OLED_HEIGHT); y++) {
+        for (uint8_t x= x_start; (x<= x_end)&&(x<OLED_WIDTH); x++) {
+            Oled_DrawPixel(x, y, color);
+        }
+    }
+    return;
+}
+
 ```
 
-### Load module trên target
+### `package/oled/Config.in`
 
-```bash
-insmod /lib/modules/ssd1306.ko
-dmesg | grep SSD
-# SSD1306 minimal driver
+```kconfig
+config BR2_PACKAGE_OLED
+    bool "oled"
+    depends on BR2_PACKAGE_OLED_I2C
+    depends on BR2_PACKAGE_OLED_FONT
+    help
+      OLED graphics library (SSD1306)
+
 ```
+
+### `package/oled/oled_font.mk`
+
+```makefile
+OLED_VERSION = 1.0
+OLED_SITE = $(TOPDIR)/package/oled/src
+OLED_SITE_METHOD = local
+
+OLED_DEPENDENCIES = oled_i2c oled-font
+OLED_INSTALL_STAGING = YES
+
+define OLED_BUILD_CMDS
+	$(TARGET_CC) $(TARGET_CFLAGS) -fPIC \
+		-I$(STAGING_DIR)/usr/include \
+		-c $(@D)/oled.c -o $(@D)/oled.o
+
+	$(TARGET_AR) rcs $(@D)/liboledgfx.a $(@D)/oled.o
+
+	$(TARGET_CC) -shared -o $(@D)/liboledgfx.so $(@D)/oled.o \
+		-L$(STAGING_DIR)/usr/lib -loled -loledfont
+endef
+
+define OLED_INSTALL_STAGING_CMDS
+	$(INSTALL) -D -m 0644 $(@D)/liboledgfx.a \
+		$(STAGING_DIR)/usr/lib/liboledgfx.a
+
+	$(INSTALL) -D -m 0755 $(@D)/liboledgfx.so \
+		$(STAGING_DIR)/usr/lib/liboledgfx.so
+
+	$(INSTALL) -D -m 0644 $(@D)/oled.h \
+		$(STAGING_DIR)/usr/include/oled.h
+endef
+
+define OLED_INSTALL_TARGET_CMDS
+	$(INSTALL) -D -m 0755 $(@D)/liboledgfx.so \
+		$(TARGET_DIR)/usr/lib/liboledgfx.so
+endef
+
+$(eval $(generic-package))
+
+
+```
+
+### Tích hợp vào Buildroot
+
+- Thêm `source "package/oled/Config.in"` vào `package/Config.in`.
+- Chọn `Target packages -> oled` trong `make menuconfig`.
+- `make` để build và cài.
 
 ---
 
-## Kiến trúc tổng quan
 
-```
-oled_app.c  (application)
-   │  gọi oled_lib API
-   ▼
-oled_lib.c  (user-space library)
-   │  write()
-   ▼
-/dev/oled   (char device)
-   │
-ssd1306.ko  (kernel module)
-   │  i2c_smbus_write_byte()
-   ▼
-I2C Bus (i2c2)
-   │
-SSD1306 OLED Hardware
-```
 
----
 
-## Tóm tắt
 
-| Thành phần | Vai trò |
-|---|---|
-| `ssd1306.ko` | Kernel driver, expose `/dev/oled`, forward bytes xuống I2C |
-| Device Tree | Khai báo device `solomon,ssd1306` trên I2C2 |
-| Buildroot package | Build và cài `.ko` vào rootfs, không sửa kernel source |
-| `oled_lib.c` | Thư viện user-space: đóng gói SSD1306 commands |
-| `oled_app.c` | Application: điều khiển logic nội dung hiển thị |
+
