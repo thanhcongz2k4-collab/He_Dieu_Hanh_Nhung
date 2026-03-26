@@ -91,6 +91,14 @@ void Oled_WriteData(uint8_t* buffer, size_t buff_size)
 /* Initialize the oled screen */
 void Oled_Init(void) 
 {
+    uint8_t mux_ratio = 0x3F;
+    uint8_t com_pins_cfg = 0x12;
+
+    if (OLED_HEIGHT == 32) {
+        mux_ratio = 0x1F;
+        com_pins_cfg = 0x02;
+    }
+
     I2Cx_Init();
     for(volatile int i=0; i<0xfffff; i++);
 
@@ -107,7 +115,7 @@ void Oled_Init(void)
     Oled_WriteCommand(0xA1);
     Oled_WriteCommand(0xA6);
     Oled_WriteCommand(0xA8);
-    Oled_WriteCommand(0x3F);
+    Oled_WriteCommand(mux_ratio);
     Oled_WriteCommand(0xA4);
     Oled_WriteCommand(0xD3);
     Oled_WriteCommand(0x00);
@@ -116,7 +124,7 @@ void Oled_Init(void)
     Oled_WriteCommand(0xD9);
     Oled_WriteCommand(0xF1);
     Oled_WriteCommand(0xDA);
-    Oled_WriteCommand(0x12);
+    Oled_WriteCommand(com_pins_cfg);
     Oled_WriteCommand(0xDB);
     Oled_WriteCommand(0x40);
     Oled_WriteCommand(0x8D);
