@@ -141,7 +141,7 @@ static struct class *oled_class;
 static struct device *oled_device;
 
 static ssize_t oled_write(struct file *file, const char __user *buf, size_t len, loff_t *off){
-    u8 data[32]; 
+    u8 data[129]; 
     int ret;
     if (len > sizeof(data))
         len = sizeof(data);
@@ -249,18 +249,27 @@ make
 ## Bước 5 — Viết thư viện 
 
 
-### Cấu trúc thư mục đề xuất oled-font
+### Cấu trúc thư mục đề xuất oled
 
 ```
-package/oled-font/
+package/oled/
 ├── Config.in
-├── oled-font.mk
+├── oled.mk
 └── src/
-    ├── oled-fonts.h
-    ├── oled-fonts.c
+    ├── oled/
+    │   ├── oled.c
+    │   └── oled.h
+    │
+    ├── oled_i2c/
+    │   ├── oled_i2c.c
+    │   └── oled_i2c.h
+    │
+    └── oled_fonts/
+        ├── oled_fonts.c
+        └── oled_fonts.h
 ```
 
-### `src/oled_fonts.h`
+### `src/oled_fonts/oled_fonts.h`
 
 ```c
 #ifndef __OLED_FONTS_H__
@@ -293,7 +302,7 @@ extern const GFXfont_t Serif_plain_10;
 
 ```
 
-### `src/oled_fonts.c`
+### `src/oled_fonts/oled_fonts.c`
 
 ```c
 
@@ -503,65 +512,7 @@ const GFXfont_t Serif_plain_10 PROGMEM = {
 
 ```
 
-### `package/oled_font/Config.in`
-
-```kconfig
-config BR2_PACKAGE_OLED_FONT
-    bool "oled-font"
-    help
-      Simple OLED font library (GFX style)
-```
-
-### `package/oled_font/oled_font.mk`
-
-```makefile
-OLED_FONT_VERSION = 1.0
-OLED_FONT_SITE = $(TOPDIR)/package/oled-font/src
-OLED_FONT_SITE_METHOD = local
-OLED_FONT_INSTALL_STAGING = YES
-
-define OLED_FONT_BUILD_CMDS
-	$(TARGET_CC) $(TARGET_CFLAGS) -fPIC -c $(@D)/oled_fonts.c -o $(@D)/oled_fonts.o
-	$(TARGET_AR) rcs $(@D)/liboledfont.a $(@D)/oled_fonts.o
-endef
-
-define OLED_FONT_INSTALL_STAGING_CMDS
-	$(INSTALL) -D -m 0644 $(@D)/liboledfont.a \
-		$(STAGING_DIR)/usr/lib/liboledfont.a
-
-	$(INSTALL) -D -m 0644 $(@D)/oled_fonts.h \
-		$(STAGING_DIR)/usr/include/oled_fonts.h
-endef
-
-define OLED_FONT_INSTALL_TARGET_CMDS
-	$(INSTALL) -D -m 0644 $(@D)/liboledfont.a \
-		$(TARGET_DIR)/usr/lib/liboledfont.a
-endef
-
-$(eval $(generic-package))
-
-```
-
-### Tích hợp vào Buildroot
-
-- Thêm `source "package/oled-font/Config.in"` vào `package/Config.in`.
-- Chọn `Target packages -> oled-font` trong `make menuconfig`.
-- `make` để build và cài.
-
----
-
-### Cấu trúc thư mục đề xuất oled_i2c
-
-```
-package/oled_i2c/
-├── Config.in
-├── oled_i2c.mk
-└── src/
-    ├── oled_i2c.h
-    ├── oled_i2c.c
-```
-
-### `src/oled_i2c.h`
+### `src/oled_i2c/oled_i2c.h`
 
 ```c
 #ifndef __OLED_I2C_H__
@@ -603,7 +554,7 @@ void Oled_WriteData(uint8_t* buffer, size_t buff_size);
 
 ```
 
-### `src/oled_i2c.c`
+### `src/oled_i2c/oled_i2c.c`
 
 ```c
 #include "oled_i2c.h"
@@ -732,70 +683,8 @@ void Oled_WriteData(uint8_t* buffer, size_t buff_size)
 
 ```
 
-### `package/oled_i2c/Config.in`
 
-```kconfig
-config BR2_PACKAGE_OLED_I2C
-    bool "oled_i2c"
-    help
-      Simple OLED SSD1306 library for Linux and STM32
-
-```
-
-### `package/oled_i2c/oled_i2c.mk`
-
-```makefile
-OLED_I2C_VERSION = 1.0
-OLED_I2C_SITE = $(TOPDIR)/package/oled_i2c/src
-OLED_I2C_SITE_METHOD = local
-OLED_I2C_INSTALL_STAGING = YES
-define OLED_I2C_BUILD_CMDS
-	$(TARGET_CC) $(TARGET_CFLAGS) -fPIC -c $(@D)/oled_i2c.c -o $(@D)/oled_i2c.o
-	$(TARGET_AR) rcs $(@D)/liboled.a $(@D)/oled_i2c.o
-	$(TARGET_CC) -shared -o $(@D)/liboled.so $(@D)/oled_i2c.o
-endef
-
-define OLED_I2C_INSTALL_STAGING_CMDS
-	$(INSTALL) -D -m 0644 $(@D)/liboled.a \
-		$(STAGING_DIR)/usr/lib/liboled.a
-
-	$(INSTALL) -D -m 0755 $(@D)/liboled.so \
-		$(STAGING_DIR)/usr/lib/liboled.so
-
-	$(INSTALL) -D -m 0644 $(@D)/oled_i2c.h \
-		$(STAGING_DIR)/usr/include/oled_i2c.h
-endef
-
-define OLED_I2C_INSTALL_TARGET_CMDS
-	$(INSTALL) -D -m 0755 $(@D)/liboled.so \
-		$(TARGET_DIR)/usr/lib/liboled.so
-endef
-
-$(eval $(generic-package))
-
-
-```
-
-### Tích hợp vào Buildroot
-
-- Thêm `source "package/oled_i2c/Config.in"` vào `package/Config.in`.
-- Chọn `Target packages -> oled_i2c` trong `make menuconfig`.
-- `make` để build và cài.
-
----
-
-### Cấu trúc thư mục đề xuất oled
-
-```
-package/oled/
-├── Config.in
-├── oled.mk
-└── src/
-    ├── oled.h
-    ├── oled.c
-```
-
-### `src/oled.h`
+### `src/oled/oled.h`
 
 ```c
 #ifndef __OLED_H__
@@ -878,7 +767,7 @@ void Oled_FillRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, Oled_Col
 
 ```
 
-### `src/oled.c`
+### `src/oled/oled.c`
 
 ```c
 #include "oled.h"
@@ -1184,8 +1073,6 @@ void Oled_FillRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, Oled_Col
 ```kconfig
 config BR2_PACKAGE_OLED
     bool "oled"
-    depends on BR2_PACKAGE_OLED_I2C
-    depends on BR2_PACKAGE_OLED_FONT
     help
       OLED graphics library (SSD1306)
 
@@ -1194,38 +1081,55 @@ config BR2_PACKAGE_OLED
 ### `package/oled/oled.mk`
 
 ```makefile
+
 OLED_VERSION = 1.0
 OLED_SITE = $(TOPDIR)/package/oled/src
 OLED_SITE_METHOD = local
 
-OLED_DEPENDENCIES = oled_i2c oled-font
 OLED_INSTALL_STAGING = YES
 
 define OLED_BUILD_CMDS
+	# Compile oled.c
 	$(TARGET_CC) $(TARGET_CFLAGS) -fPIC \
-		-I$(STAGING_DIR)/usr/include \
-		-c $(@D)/oled.c -o $(@D)/oled.o
+		-I$(@D) -I$(@D)/oled -I$(@D)/oled_i2c -I$(@D)/oled_fonts \
+		-c $(@D)/oled/oled.c -o $(@D)/oled.o
 
-	$(TARGET_AR) rcs $(@D)/liboledgfx.a $(@D)/oled.o
+	# Compile oled_i2c.c
+	$(TARGET_CC) $(TARGET_CFLAGS) -fPIC \
+		-I$(@D) -I$(@D)/oled -I$(@D)/oled_i2c -I$(@D)/oled_fonts \
+		-c $(@D)/oled_i2c/oled_i2c.c -o $(@D)/oled_i2c.o
 
-	$(TARGET_CC) -shared -o $(@D)/liboledgfx.so $(@D)/oled.o \
-		-L$(STAGING_DIR)/usr/lib -loled -loledfont
+	# Compile oled_fonts.c
+	$(TARGET_CC) $(TARGET_CFLAGS) -fPIC \
+		-I$(@D) -I$(@D)/oled -I$(@D)/oled_i2c -I$(@D)/oled_fonts \
+		-c $(@D)/oled_fonts/oled_fonts.c -o $(@D)/oled_fonts.o
+
+	# Create static library
+	$(TARGET_AR) rcs $(@D)/liboled.a \
+		$(@D)/oled.o \
+		$(@D)/oled_i2c.o \
+		$(@D)/oled_fonts.o
+
+	# Create shared library
+	$(TARGET_CC) -shared -o $(@D)/liboled.so \
+		$(@D)/oled.o \
+		$(@D)/oled_i2c.o \
+		$(@D)/oled_fonts.o
 endef
 
 define OLED_INSTALL_STAGING_CMDS
-	$(INSTALL) -D -m 0644 $(@D)/liboledgfx.a \
-		$(STAGING_DIR)/usr/lib/liboledgfx.a
+	# Libraries
+	$(INSTALL) -D -m 0644 $(@D)/liboled.a $(STAGING_DIR)/usr/lib/liboled.a
+	$(INSTALL) -D -m 0755 $(@D)/liboled.so $(STAGING_DIR)/usr/lib/liboled.so
 
-	$(INSTALL) -D -m 0755 $(@D)/liboledgfx.so \
-		$(STAGING_DIR)/usr/lib/liboledgfx.so
-
-	$(INSTALL) -D -m 0644 $(@D)/oled.h \
-		$(STAGING_DIR)/usr/include/oled.h
+	# Header files
+	$(INSTALL) -D -m 0644 $(@D)/oled/oled.h $(STAGING_DIR)/usr/include/oled.h
+	$(INSTALL) -D -m 0644 $(@D)/oled_i2c/oled_i2c.h $(STAGING_DIR)/usr/include/oled_i2c.h
+	$(INSTALL) -D -m 0644 $(@D)/oled_fonts/oled_fonts.h $(STAGING_DIR)/usr/include/oled_fonts.h
 endef
 
 define OLED_INSTALL_TARGET_CMDS
-	$(INSTALL) -D -m 0755 $(@D)/liboledgfx.so \
-		$(TARGET_DIR)/usr/lib/liboledgfx.so
+	$(INSTALL) -D -m 0755 $(@D)/liboled.so $(TARGET_DIR)/usr/lib/liboled.so
 endef
 
 $(eval $(generic-package))
@@ -1296,8 +1200,6 @@ int main(void)
 config BR2_PACKAGE_OLED_TEST
     bool "oled_test"
     depends on BR2_PACKAGE_OLED
-    depends on BR2_PACKAGE_OLED_I2C
-    depends on BR2_PACKAGE_OLED_FONT
     help
       Test application for SSD1306 OLED.
       Displays "Hello Rimuru" and a counter from 1 to 10.
@@ -1310,14 +1212,14 @@ OLED_TEST_VERSION     = 1.0
 OLED_TEST_SITE        = $(TOPDIR)/package/oled_test/src
 OLED_TEST_SITE_METHOD = local
 
-OLED_TEST_DEPENDENCIES = oled oled_i2c oled-font
+OLED_TEST_DEPENDENCIES = oled
 
 define OLED_TEST_BUILD_CMDS
 	$(TARGET_CC) $(TARGET_CFLAGS) \
 		-I$(STAGING_DIR)/usr/include \
 		-L$(STAGING_DIR)/usr/lib \
 		$(@D)/oled_test.c \
-		-loledgfx -loled -loledfont -lm \
+		-loled -lm \
 		-o $(@D)/oled_test
 endef
 
