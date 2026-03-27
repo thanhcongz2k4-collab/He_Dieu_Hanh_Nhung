@@ -679,7 +679,7 @@ void Oled_WriteData(uint8_t* buffer, size_t buff_size)
         perror("write data");
     }
 }
-
+#endif
 
 ```
 
