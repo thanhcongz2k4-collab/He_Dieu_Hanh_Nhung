@@ -1191,7 +1191,7 @@ config BR2_PACKAGE_OLED
 
 ```
 
-### `package/oled/oled_font.mk`
+### `package/oled/oled.mk`
 
 ```makefile
 OLED_VERSION = 1.0
@@ -1241,8 +1241,100 @@ $(eval $(generic-package))
 
 ---
 
+### Cấu trúc thư mục đề xuất oled_test
 
+```
+package/oled_test/
+├── Config.in
+├── oled_test.mk
+└── src/
+    ├── oled_test.c
+```
 
+### `src/oled_test.c`
 
+```c
+#include <stdio.h>
+#include <unistd.h>
+#include "oled.h"
 
+int main(void)
+{
+    Oled_Init();
+
+    int count = 1;
+    char buf[32];
+
+    while (1) {
+        Oled_Fill(Black);
+
+        /* Dòng 1: Hello Rimuru */
+        Oled_SetCursor(0, 8);
+        Oled_WriteString("Hello Rimuru", &DEFAULT_FONT, White);
+
+        /* Dòng 2: Count */
+        snprintf(buf, sizeof(buf), "Count: %d", count);
+        Oled_SetCursor(0, 22);
+        Oled_WriteString(buf, &DEFAULT_FONT, White);
+
+        Oled_UpdateScreen();
+
+        count++;
+        if (count > 10)
+            count = 1;
+
+        sleep(1);
+    }
+
+    return 0;
+}
+
+```
+### `package/oled_test/Config.in`
+
+```
+config BR2_PACKAGE_OLED_TEST
+    bool "oled_test"
+    depends on BR2_PACKAGE_OLED
+    depends on BR2_PACKAGE_OLED_I2C
+    depends on BR2_PACKAGE_OLED_FONT
+    help
+      Test application for SSD1306 OLED.
+      Displays "Hello Rimuru" and a counter from 1 to 10.
+
+```
+### `package/oled_test/oled_test.mk`
+
+```
+OLED_TEST_VERSION     = 1.0
+OLED_TEST_SITE        = $(TOPDIR)/package/oled_test/src
+OLED_TEST_SITE_METHOD = local
+
+OLED_TEST_DEPENDENCIES = oled oled_i2c oled-font
+
+define OLED_TEST_BUILD_CMDS
+	$(TARGET_CC) $(TARGET_CFLAGS) \
+		-I$(STAGING_DIR)/usr/include \
+		-L$(STAGING_DIR)/usr/lib \
+		$(@D)/oled_test.c \
+		-loledgfx -loled -loledfont -lm \
+		-o $(@D)/oled_test
+endef
+
+define OLED_TEST_INSTALL_TARGET_CMDS
+	$(INSTALL) -D -m 0755 $(@D)/oled_test \
+		$(TARGET_DIR)/usr/bin/oled_test
+endef
+
+$(eval $(generic-package))
+
+```
+
+### Tích hợp vào Buildroot
+
+- Thêm `source "package/oled_test/Config.in"` vào `package/Config.in`.
+- Chọn `Target packages -> oled_test` trong `make menuconfig`.
+- `make` để build và cài.
+
+---
 
