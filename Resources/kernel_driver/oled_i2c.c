@@ -98,12 +98,27 @@ void Oled_Open(void)
 
 void Oled_WriteCommand(uint8_t cmd) 
 {
-    uint8_t buf[2] = {0x00, cmd}; // 0x00 = command byte prefix
-    write(fd, buf, 2);
+    if (fd < 0) return;
+
+    uint8_t buf[2] = {0x00, cmd};
+    if (write(fd, buf, 2) < 0) {
+        perror("write command");
+    }
 }
 
 void Oled_WriteData(uint8_t* buffer, size_t buff_size) 
 {
-    write(fd, buffer, buff_size);
+    if (fd < 0) return;
+
+    uint8_t tmp[buff_size + 1];
+    tmp[0] = 0x40;
+
+    for (size_t i = 0; i < buff_size; i++) {
+        tmp[i + 1] = buffer[i];
+    }
+
+    if (write(fd, tmp, buff_size + 1) < 0) {
+        perror("write data");
+    }
 }
 #endif

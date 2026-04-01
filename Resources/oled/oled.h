@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 // Sử dụng SPL cho STM32F103
-#include "../kernel_driver/oled_i2c.h"
+#include "oled_i2c.h"
 #include "oled_fonts.h"
 
 // #define FLIP_IMG
