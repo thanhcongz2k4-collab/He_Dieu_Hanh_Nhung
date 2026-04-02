@@ -1,6 +1,7 @@
 #include "nrf24l01.h"
 #include "spi.h"
 #include "string.h"
+#include "delay.h"
 
 /**
  * Gửi một lệnh (cmd) kèm dữ liệu tới NRF qua SPI.

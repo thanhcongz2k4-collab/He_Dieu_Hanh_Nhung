@@ -65,6 +65,8 @@ void Task_Oled(void *parameter)
 
 void Task_NRF_Receiver(void *parameter)
 {
+    RGBLed_Init();
+    
     NRF_RX_Mode_Init(addr, channel);
     NRF_StartListening();
     while (1) 

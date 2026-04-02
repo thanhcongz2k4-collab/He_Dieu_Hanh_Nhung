@@ -388,6 +388,11 @@
               <FileType>1</FileType>
               <FilePath>.\Resources\main\main.c</FilePath>
             </File>
+            <File>
+              <FileName>delay.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Resources\main\delay.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

@@ -4,13 +4,6 @@
 extern "C"{
 #endif
 #include <stdint.h>
-#include "config.h"
-
-
-#include "FreeRTOS.h"
-#include "task.h"
-
-#define delay_ms(ms)  vTaskDelay(pdMS_TO_TICKS(ms))
 
 //#define TX_MODE
 

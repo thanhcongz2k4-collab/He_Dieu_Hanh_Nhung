@@ -1,5 +1,6 @@
 --cpu Cortex-M3
 ".\objects\main.o"
+".\objects\delay.o"
 ".\objects\oled.o"
 ".\objects\oled_fonts.o"
 ".\objects\oled_i2c.o"
