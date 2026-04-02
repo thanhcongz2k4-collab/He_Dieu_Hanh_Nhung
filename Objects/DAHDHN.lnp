@@ -5,7 +5,7 @@
 ".\objects\oled_fonts.o"
 ".\objects\oled_i2c.o"
 ".\objects\rgbled_pwm.o"
-".\objects\spi.o"
+".\objects\nrf_spi.o"
 ".\objects\nrf24l01.o"
 ".\objects\rgb_led.o"
 ".\objects\clib_os.o"

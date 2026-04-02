@@ -1,5 +1,5 @@
-#ifndef __SPI1__
-#define __SPI1__
+#ifndef __NRF_SPI__
+#define __NRF_SPI__
 #ifdef __cplusplus
 extern "C"{
 #endif

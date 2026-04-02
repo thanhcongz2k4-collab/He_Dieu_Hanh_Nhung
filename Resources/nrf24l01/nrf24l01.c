@@ -1,5 +1,5 @@
 #include "nrf24l01.h"
-#include "spi.h"
+#include "nrf_spi.h"
 #include "string.h"
 #include "delay.h"
 

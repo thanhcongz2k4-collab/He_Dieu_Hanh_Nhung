@@ -13,7 +13,7 @@
  - Nếu thiết bị ngoại vi yêu cầu CPOL/CPHA khác, cần điều chỉnh cho phù hợp.
 ================================================================================
 */
-#include "spi.h"
+#include "nrf_spi.h"
 
 
 void SPI_Open(void)

@@ -424,9 +424,9 @@
               <FilePath>.\Resources\kernel_driver\rgbled_pwm.c</FilePath>
             </File>
             <File>
-              <FileName>spi.c</FileName>
+              <FileName>nrf_spi.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\Resources\kernel_driver\spi.c</FilePath>
+              <FilePath>.\Resources\kernel_driver\nrf_spi.c</FilePath>
             </File>
           </Files>
         </Group>
