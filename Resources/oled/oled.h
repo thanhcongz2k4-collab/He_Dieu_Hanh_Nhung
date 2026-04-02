@@ -22,7 +22,7 @@
 
 // SSD1306 OLED height in pixels
 #ifndef OLED_HEIGHT
-#define OLED_HEIGHT          32
+#define OLED_HEIGHT          64
 #endif
 
 // SSD1306 width in pixels

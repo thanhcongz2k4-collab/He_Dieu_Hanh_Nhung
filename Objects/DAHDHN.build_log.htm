@@ -22,16 +22,14 @@ Dialog DLL:      TCM.DLL V1.46.0.0
  
 <h2>Project:</h2>
 D:\Documents\PTIT\Nam 4 - Ky 2\Do_an_he_dieu_hanh_nhung\DAHDHN.uvprojx
-Project File Date:  03/26/2026
+Project File Date:  04/02/2026
 
 <h2>Output:</h2>
 *** Using Compiler 'V6.14', folder: 'D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin'
 Build target 'Target 1'
 compiling main.c...
-compiling oled_i2c.c...
-compiling oled.c...
 linking...
-Program Size: Code=8652 RO-data=1572 RW-data=4 ZI-data=12004  
+Program Size: Code=13516 RO-data=1600 RW-data=8 ZI-data=14024  
 ".\Objects\DAHDHN.axf" - 0 Error(s), 0 Warning(s).
 
 <h2>Software Packages used:</h2>
@@ -68,6 +66,8 @@ Package Vendor: Keil
    * Component: GPIO Version: 3.6.0
    * Component: I2C Version: 3.6.0
    * Component: RCC Version: 3.6.0
+   * Component: SPI Version: 3.6.0
+   * Component: TIM Version: 3.6.0
    * Component: USART Version: 3.6.0
 
 <h2>Collection of Component include folders:</h2>
@@ -95,13 +95,13 @@ Package Vendor: Keil
 
    * Component: ARM.FreeRTOS::RTOS:Core:Cortex-M:11.2.0
       Source file:   Source\list.c
+      Include file:  Source\include\FreeRTOS.h
       Include file:  Source\include\queue.h
+      Include file:  Source\include\task.h
       Source file:   Source\queue.c
-      Source file:   Source\tasks.c
       Include file:  Source\include\semphr.h
       Source file:   Source\portable\GCC\ARM_CM3\port.c
-      Include file:  Source\include\FreeRTOS.h
-      Include file:  Source\include\task.h
+      Source file:   Source\tasks.c
       Source file:   CMSIS\RTOS2\FreeRTOS\Source\freertos_evr.c
 
    * Component: ARM.FreeRTOS::RTOS:Event Groups:11.2.0
@@ -121,34 +121,34 @@ Package Vendor: Keil
       Source file:   CMSIS\RTOS2\Source\os_systick.c
 
    * Component: ARM::CMSIS:RTOS2:FreeRTOS:Cortex-M:11.2.0
-      Source file:   CMSIS\RTOS2\FreeRTOS\Source\clib_os.c
       Include file:  CMSIS\RTOS2\FreeRTOS\Include\freertos_mpool.h
       Source file:   CMSIS\RTOS2\FreeRTOS\Source\cmsis_os2.c
+      Source file:   CMSIS\RTOS2\FreeRTOS\Source\clib_os.c
 
    * Component: Keil::Device:Startup:1.0.0
+      Source file:   Device\Source\ARM\STM32F1xx_OPT.s
+      Include file:  RTE_Driver\Config\RTE_Device.h
       Source file:   Device\Source\ARM\startup_stm32f10x_md.s
       Source file:   Device\Source\system_stm32f10x.c
-      Include file:  RTE_Driver\Config\RTE_Device.h
-      Source file:   Device\Source\ARM\STM32F1xx_OPT.s
 
    * Component: Keil::Device:StdPeriph Drivers:ADC:3.6.0
       Include file:  Device\StdPeriph_Driver\inc\stm32f10x_adc.h
       Source file:   Device\StdPeriph_Driver\src\stm32f10x_adc.c
 
    * Component: Keil::Device:StdPeriph Drivers:EXTI:3.6.0
-      Include file:  Device\StdPeriph_Driver\inc\stm32f10x_exti.h
       Source file:   Device\StdPeriph_Driver\src\stm32f10x_exti.c
+      Include file:  Device\StdPeriph_Driver\inc\stm32f10x_exti.h
 
    * Component: Keil::Device:StdPeriph Drivers:Flash:3.6.0
-      Source file:   Device\StdPeriph_Driver\src\stm32f10x_flash.c
       Include file:  Device\StdPeriph_Driver\inc\stm32f10x_flash.h
+      Source file:   Device\StdPeriph_Driver\src\stm32f10x_flash.c
 
    * Component: Keil::Device:StdPeriph Drivers:Framework:3.6.0
-      Source file:   Device\StdPeriph_Driver\templates\stm32f10x_conf.h
-      Include file:  Device\StdPeriph_Driver\inc\misc.h
       Source file:   Device\StdPeriph_Driver\src\misc.c
-      Include file:  Device\StdPeriph_Driver\templates\stm32f10x_it.h
       Source file:   Device\StdPeriph_Driver\templates\stm32f10x_it.c
+      Include file:  Device\StdPeriph_Driver\inc\misc.h
+      Source file:   Device\StdPeriph_Driver\templates\stm32f10x_conf.h
+      Include file:  Device\StdPeriph_Driver\templates\stm32f10x_it.h
 
    * Component: Keil::Device:StdPeriph Drivers:GPIO:3.6.0
       Include file:  Device\StdPeriph_Driver\inc\stm32f10x_gpio.h
@@ -161,6 +161,14 @@ Package Vendor: Keil
    * Component: Keil::Device:StdPeriph Drivers:RCC:3.6.0
       Include file:  Device\StdPeriph_Driver\inc\stm32f10x_rcc.h
       Source file:   Device\StdPeriph_Driver\src\stm32f10x_rcc.c
+
+   * Component: Keil::Device:StdPeriph Drivers:SPI:3.6.0
+      Source file:   Device\StdPeriph_Driver\src\stm32f10x_spi.c
+      Include file:  Device\StdPeriph_Driver\inc\stm32f10x_spi.h
+
+   * Component: Keil::Device:StdPeriph Drivers:TIM:3.6.0
+      Include file:  Device\StdPeriph_Driver\inc\stm32f10x_tim.h
+      Source file:   Device\StdPeriph_Driver\src\stm32f10x_tim.c
 
    * Component: Keil::Device:StdPeriph Drivers:USART:3.6.0
       Source file:   Device\StdPeriph_Driver\src\stm32f10x_usart.c

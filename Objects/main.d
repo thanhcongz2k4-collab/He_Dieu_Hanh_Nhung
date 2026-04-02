@@ -1,10 +1,9 @@
 ./objects/main.o: Resources\main\main.c Resources\main\all_header.h \
-  Resources\main\..\oled\oled.h \
-  D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\stddef.h \
   D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\stdint.h \
-  Resources\main\..\oled\..\kernel_driver\oled_i2c.h \
   D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\stdlib.h \
-  Resources\main\..\oled\..\kernel_driver\config.h \
+  Resources\kernel_driver\config.h Resources\oled\oled.h \
+  D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\stddef.h \
+  Resources\kernel_driver\oled_i2c.h Resources\kernel_driver\config.h \
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\Include\stm32f10x.h \
   RTE\_Target_1\RTE_Components.h \
   D:\Setup\Keilc\Pack\ARM\CMSIS\6.2.0\CMSIS\Core\Include\core_cm3.h \
@@ -21,6 +20,19 @@
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\stm32f10x_gpio.h \
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\stm32f10x_i2c.h \
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\stm32f10x_rcc.h \
+  D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\stm32f10x_spi.h \
+  D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\stm32f10x_tim.h \
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\stm32f10x_usart.h \
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\misc.h \
-  Resources\main\..\oled\oled_fonts.h
+  Resources\oled\oled_fonts.h Resources\nrf24l01\nrf24l01.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\Source\include\FreeRTOS.h \
+  RTE\RTOS\FreeRTOSConfig.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\CMSIS\RTOS2\FreeRTOS\Include\freertos_evr.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\Source\include\projdefs.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\Source\include\portable.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\Source\include\deprecated_definitions.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\Source\portable\GCC\ARM_CM3\portmacro.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\Source\include\mpu_wrappers.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\Source\include\task.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\Source\include\list.h \
+  Resources\nrf24l01\rgb_led.h Resources\kernel_driver\rgbled_pwm.h

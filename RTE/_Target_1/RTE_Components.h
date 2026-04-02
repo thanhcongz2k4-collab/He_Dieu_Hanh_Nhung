@@ -43,6 +43,10 @@
 #define RTE_DEVICE_STDPERIPH_I2C
 /*  Keil::Device:StdPeriph Drivers:RCC:3.6.0 */
 #define RTE_DEVICE_STDPERIPH_RCC
+/*  Keil::Device:StdPeriph Drivers:SPI:3.6.0 */
+#define RTE_DEVICE_STDPERIPH_SPI
+/*  Keil::Device:StdPeriph Drivers:TIM:3.6.0 */
+#define RTE_DEVICE_STDPERIPH_TIM
 /*  Keil::Device:StdPeriph Drivers:USART:3.6.0 */
 #define RTE_DEVICE_STDPERIPH_USART
 
