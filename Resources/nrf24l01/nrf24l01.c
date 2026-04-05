@@ -141,8 +141,6 @@ uint8_t NRF_ReadStatus(void)
 }
 
 /*------------------------------------------ TX Mode ------------------------------------------*/
-#ifdef TX_MODE
-
 /**
  * Khởi tạo NRF ở chế độ TX (phát): bật CRC, Auto-ACK, cấu hình địa chỉ/kênh,
  * set payload width, clear cờ STATUS, flush TX, về PWR_UP và CE thấp.
@@ -228,8 +226,6 @@ void NRF_SendData(uint8_t *data, uint8_t len)
 }
 
 /*------------------------------------------ RX Mode ------------------------------------------*/
-#else
-
 /**
  * Khởi tạo NRF ở chế độ RX (nghe/nhận): bật CRC, PRIM_RX, Auto-ACK, địa chỉ,
  * kênh, RF_SETUP, payload width; clear cờ STATUS, bật PWR_UP, flush RX, CE=1.
@@ -328,5 +324,3 @@ void NRF_ReadData(uint8_t *data, uint8_t len)
 	// Xóa cờ RX_DR
 	NRF_WriteReg_WithOneByte(NRF_REG_STATUS, STATUS_RX_DR);
 }
-
-#endif

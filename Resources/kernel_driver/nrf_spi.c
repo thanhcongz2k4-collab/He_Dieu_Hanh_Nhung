@@ -17,6 +17,16 @@
 
 #if !defined(TEST_STM32)
 	
+void NRF_Set_CE(uint8_t value)
+{
+
+}
+
+void NRF_Set_CSN(uint8_t value)
+{
+
+}
+
 void NRF_SPI_Config(void)
 {
 	// Implementation for non-STM32 platforms

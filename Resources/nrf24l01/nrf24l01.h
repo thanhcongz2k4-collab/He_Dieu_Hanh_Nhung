@@ -5,8 +5,6 @@ extern "C"{
 #endif
 #include <stdint.h>
 
-//#define TX_MODE
-
 
 #define ADDRESS_LENGTH  5
 #define PACKET_SIZE     32  
@@ -132,19 +130,16 @@ void NRF_WriteReg_WithMultiBytes(uint8_t reg, uint8_t *data, uint8_t len);
 void NRF_ReadReg_WithMultiBytes(uint8_t reg, uint8_t *data, uint8_t len);
 
 
-#ifdef TX_MODE
 void NRF_TX_Mode_Init(const uint8_t *addr, const uint8_t channel);
 void NRF_SendData(uint8_t *data, uint8_t len);
 void NRF_Flush_TX(void);
 
-#else
 void NRF_RX_Mode_Init(const uint8_t *addr, const uint8_t channel);
 void NRF_StartListening(void);
 void NRF_StopListening(void);
 uint8_t NRF_DataReady(void);
 void NRF_ReadData(uint8_t *data, uint8_t len);
 void NRF_Flush_RX(void);
-#endif
 
 #ifdef __cplusplus
 }

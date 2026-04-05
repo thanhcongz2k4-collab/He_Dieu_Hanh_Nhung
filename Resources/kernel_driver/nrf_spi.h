@@ -18,6 +18,15 @@ extern "C"{
 #define NRF_CE_LOW()    GPIOA->BRR  = CE_PIN
 #define NRF_CSN_HIGH()  GPIOA->BSRR = CSN_PIN
 #define NRF_CSN_LOW()   GPIOA->BRR  = CSN_PIN
+#else 
+
+#define NRF_CE_HIGH()   NRF_Set_CE(1)
+#define NRF_CE_LOW()    NRF_Set_CE(0)
+#define NRF_CSN_HIGH()  NRF_Set_CSN(1)
+#define NRF_CSN_LOW()   NRF_Set_CSN(0)
+
+void NRF_Set_CE(uint8_t value);
+void NRF_Set_CSN(uint8_t value);
 
 #endif
 

@@ -1,7 +1,7 @@
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
-#define TEST_STM32
+// #define TEST_STM32
 
 #if defined(TEST_STM32)
 #define FUNC_POINTER
