@@ -15,8 +15,22 @@
 */
 #include "nrf_spi.h"
 
+#if !defined(TEST_STM32)
+	
+void NRF_SPI_Config(void)
+{
+	// Implementation for non-STM32 platforms
+}
 
-void SPI_Open(void)
+uint16_t NRF_SPI_Transfer(uint16_t data)
+{
+	// Implementation for non-STM32 platforms
+	return 0;
+}
+
+#else
+
+void NRF_SPI_Config(void)
 {
 	GPIO_InitTypeDef GPIO_InitStructure;
 	SPI_InitTypeDef  SPI_InitStructure;
@@ -60,7 +74,7 @@ void SPI_Open(void)
 	NRF_CSN_HIGH();
 }
 
-uint16_t SPI_Transfer(uint16_t data)
+uint16_t NRF_SPI_Transfer(uint16_t data)
 {
 	// Chờ TXE=1 -> bộ đệm truyền rỗng
 	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET);
@@ -71,3 +85,5 @@ uint16_t SPI_Transfer(uint16_t data)
 	// Đọc dữ liệu nhận và trả về
 	return SPI_I2S_ReceiveData(SPI1);
 }
+
+#endif

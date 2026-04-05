@@ -17,7 +17,7 @@
 
 void RGBLed_Init(void)
 {
-  RGBLed_PWM_Open();
+  RGBLed_PWM_Config();
 }
 
 
@@ -34,8 +34,8 @@ RGB_Led 	HSVtoRGB(float h, int s, int v)
 	
   float hh, p, q, t, ff;
   int i;
-  float S = s / 1000.0;
-  float V = v / 1000.0;
+  float S = s / (float)RGBLED_PWM_MAX_DUTY;
+  float V = v / (float)RGBLED_PWM_MAX_DUTY;
 
   if (s <= 0) {
     rgb.red_value = rgb.green_value = rgb.blue_value = v;
@@ -50,12 +50,12 @@ RGB_Led 	HSVtoRGB(float h, int s, int v)
   t = V * (1.0 - (S * (1.0 - ff)));
 
   switch (i) {
-    case 0: rgb.red_value = V * 1000; rgb.green_value = t * 1000; rgb.blue_value = p * 1000; break;
-    case 1: rgb.red_value = q * 1000; rgb.green_value = V * 1000; rgb.blue_value = p * 1000; break;
-    case 2: rgb.red_value = p * 1000; rgb.green_value = V * 1000; rgb.blue_value = t * 1000; break;
-    case 3: rgb.red_value = p * 1000; rgb.green_value = q * 1000; rgb.blue_value = V * 1000; break;
-    case 4: rgb.red_value = t * 1000; rgb.green_value = p * 1000; rgb.blue_value = V * 1000; break;
-    default:rgb.red_value = V * 1000; rgb.green_value = p * 1000; rgb.blue_value = q * 1000; break;
+    case 0: rgb.red_value = V * RGBLED_PWM_MAX_DUTY; rgb.green_value = t * RGBLED_PWM_MAX_DUTY; rgb.blue_value = p * RGBLED_PWM_MAX_DUTY; break;
+    case 1: rgb.red_value = q * RGBLED_PWM_MAX_DUTY; rgb.green_value = V * RGBLED_PWM_MAX_DUTY; rgb.blue_value = p * RGBLED_PWM_MAX_DUTY; break;
+    case 2: rgb.red_value = p * RGBLED_PWM_MAX_DUTY; rgb.green_value = V * RGBLED_PWM_MAX_DUTY; rgb.blue_value = t * RGBLED_PWM_MAX_DUTY; break;
+    case 3: rgb.red_value = p * RGBLED_PWM_MAX_DUTY; rgb.green_value = q * RGBLED_PWM_MAX_DUTY; rgb.blue_value = V * RGBLED_PWM_MAX_DUTY; break;
+    case 4: rgb.red_value = t * RGBLED_PWM_MAX_DUTY; rgb.green_value = p * RGBLED_PWM_MAX_DUTY; rgb.blue_value = V * RGBLED_PWM_MAX_DUTY; break;
+    default:rgb.red_value = V * RGBLED_PWM_MAX_DUTY; rgb.green_value = p * RGBLED_PWM_MAX_DUTY; rgb.blue_value = q * RGBLED_PWM_MAX_DUTY; break;
   }
 	
 	return rgb;

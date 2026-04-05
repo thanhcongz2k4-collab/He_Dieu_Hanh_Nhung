@@ -21,4 +21,15 @@
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\stm32f10x_tim.h \
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\stm32f10x_usart.h \
   D:\Setup\Keilc\Pack\Keil\STM32F1xx_DFP\2.4.1\Device\StdPeriph_Driver\inc\misc.h \
-  Resources\kernel_driver\rgbled_pwm.h
+  Resources\kernel_driver\rgbled_pwm.h \
+  D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\stdlib.h \
+  Resources\kernel_driver\config.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\Source\include\FreeRTOS.h \
+  D:\Setup\Keilc\Core\ARM\ARMCLANG\Bin\..\include\stddef.h \
+  RTE\RTOS\FreeRTOSConfig.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\CMSIS\RTOS2\FreeRTOS\Include\freertos_evr.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\Source\include\projdefs.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\Source\include\portable.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\Source\include\deprecated_definitions.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\Source\portable\GCC\ARM_CM3\portmacro.h \
+  D:\Setup\Keilc\Pack\ARM\CMSIS-FreeRTOS\11.2.0\Source\include\mpu_wrappers.h

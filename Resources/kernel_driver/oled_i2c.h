@@ -18,8 +18,8 @@
 
 #endif
 
-void Oled_Open(void);
-void Oled_WriteCommand(uint8_t cmd);
-void Oled_WriteData(uint8_t* buffer, size_t buff_size);
+void Oled_I2C_Init(void);
+void Oled_I2C_WriteCommand(uint8_t cmd);
+void Oled_I2C_WriteData(uint8_t* buffer, size_t buff_size);
 
 #endif // __OLED_I2C_H__

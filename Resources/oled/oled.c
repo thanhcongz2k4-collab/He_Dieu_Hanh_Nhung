@@ -21,37 +21,37 @@ void Oled_Init(void)
         com_pins_cfg = 0x02;
     }
 
-    Oled_Open();
+    Oled_I2C_Init();
     for(volatile int i=0; i<0xfffff; i++);
 
-    Oled_WriteCommand(0xAE);
-    Oled_WriteCommand(0x20); // memory addressing mode
-    Oled_WriteCommand(0x00); // horizontal
-    Oled_WriteCommand(0xB0);
-    Oled_WriteCommand(0xC8);
-    Oled_WriteCommand(0x00);
-    Oled_WriteCommand(0x10);
-    Oled_WriteCommand(0x40);
-    Oled_WriteCommand(0x81);
-    Oled_WriteCommand(0x7F);
-    Oled_WriteCommand(0xA1);
-    Oled_WriteCommand(0xA6);
-    Oled_WriteCommand(0xA8);
-    Oled_WriteCommand(mux_ratio);
-    Oled_WriteCommand(0xA4);
-    Oled_WriteCommand(0xD3);
-    Oled_WriteCommand(0x00);
-    Oled_WriteCommand(0xD5);
-    Oled_WriteCommand(0x80);
-    Oled_WriteCommand(0xD9);
-    Oled_WriteCommand(0xF1);
-    Oled_WriteCommand(0xDA);
-    Oled_WriteCommand(com_pins_cfg);
-    Oled_WriteCommand(0xDB);
-    Oled_WriteCommand(0x40);
-    Oled_WriteCommand(0x8D);
-    Oled_WriteCommand(0x14);
-    Oled_WriteCommand(0xAF);
+    Oled_I2C_WriteCommand(0xAE);
+    Oled_I2C_WriteCommand(0x20); // memory addressing mode
+    Oled_I2C_WriteCommand(0x00); // horizontal
+    Oled_I2C_WriteCommand(0xB0);
+    Oled_I2C_WriteCommand(0xC8);
+    Oled_I2C_WriteCommand(0x00);
+    Oled_I2C_WriteCommand(0x10);
+    Oled_I2C_WriteCommand(0x40);
+    Oled_I2C_WriteCommand(0x81);
+    Oled_I2C_WriteCommand(0x7F);
+    Oled_I2C_WriteCommand(0xA1);
+    Oled_I2C_WriteCommand(0xA6);
+    Oled_I2C_WriteCommand(0xA8);
+    Oled_I2C_WriteCommand(mux_ratio);
+    Oled_I2C_WriteCommand(0xA4);
+    Oled_I2C_WriteCommand(0xD3);
+    Oled_I2C_WriteCommand(0x00);
+    Oled_I2C_WriteCommand(0xD5);
+    Oled_I2C_WriteCommand(0x80);
+    Oled_I2C_WriteCommand(0xD9);
+    Oled_I2C_WriteCommand(0xF1);
+    Oled_I2C_WriteCommand(0xDA);
+    Oled_I2C_WriteCommand(com_pins_cfg);
+    Oled_I2C_WriteCommand(0xDB);
+    Oled_I2C_WriteCommand(0x40);
+    Oled_I2C_WriteCommand(0x8D);
+    Oled_I2C_WriteCommand(0x14);
+    Oled_I2C_WriteCommand(0xAF);
     
     // Clear screen
     Oled_Fill(Black);
@@ -83,10 +83,10 @@ void Oled_UpdateScreen(void)
     //  * 128px  ==  16 pages
     for(uint8_t page = 0; page < OLED_HEIGHT/8; page++) 
     {
-        Oled_WriteCommand(0xB0 + page); // Set page address
-        Oled_WriteCommand(0x00 + OLED_X_OFFSET_LOWER); // Set lower column address
-        Oled_WriteCommand(0x10 + OLED_X_OFFSET_UPPER); // Set higher column address
-        Oled_WriteData(&oled_buffer[OLED_WIDTH*page], OLED_WIDTH);
+        Oled_I2C_WriteCommand(0xB0 + page); // Set page address
+        Oled_I2C_WriteCommand(0x00 + OLED_X_OFFSET_LOWER); // Set lower column address
+        Oled_I2C_WriteCommand(0x10 + OLED_X_OFFSET_UPPER); // Set higher column address
+        Oled_I2C_WriteData(&oled_buffer[OLED_WIDTH*page], OLED_WIDTH);
     }
 }
 

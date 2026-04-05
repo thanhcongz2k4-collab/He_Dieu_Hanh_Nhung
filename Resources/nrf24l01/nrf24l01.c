@@ -1,7 +1,6 @@
 #include "nrf24l01.h"
 #include "nrf_spi.h"
 #include "string.h"
-#include "delay.h"
 
 /**
  * Gửi một lệnh (cmd) kèm dữ liệu tới NRF qua SPI.
@@ -20,17 +19,17 @@ void NRF_WriteCmd(uint8_t cmd, uint8_t *value, uint8_t len)
 	// Kéo CSN xuống thấp để bắt đầu phiên SPI với NRF24L01
 	NRF_CSN_LOW();
 	// Gửi byte lệnh đầu tiên
-	SPI_Transfer(cmd);
+	NRF_SPI_Transfer(cmd);
 	if(len == 1)
 	{
 		// Trường hợp chỉ có 1 byte dữ liệu đính kèm lệnh
-		// Lưu ý: gọi SPI_Transfer(value) sẽ truyền giá trị con trỏ, không phải byte dữ liệu
-		SPI_Transfer(value); 
+		// Lưu ý: gọi NRF_SPI_Transfer(value) sẽ truyền giá trị con trỏ, không phải byte dữ liệu
+		NRF_SPI_Transfer(value); 
 	}
 	else 
 	{
 		// Gửi lần lượt từng byte, sau mỗi lần gửi con trỏ tăng 1
-		while(len--) SPI_Transfer(*value++); 
+		while(len--) NRF_SPI_Transfer(*value++); 
 	}
 	// Kéo CSN lên cao để kết thúc phiên SPI
 	NRF_CSN_HIGH();
@@ -49,9 +48,9 @@ void NRF_ReadCmd(uint8_t cmd, uint8_t *value, uint8_t len)
 	// Bắt đầu giao tiếp SPI
 	NRF_CSN_LOW();
 	// Gửi lệnh đọc trước
-	SPI_Transfer(cmd);
+	NRF_SPI_Transfer(cmd);
 	// Mỗi byte nhận về tương ứng 1 lần clock ra một byte NOP
-	while(len--) *value++ = SPI_Transfer(NRF_CMD_NOP); 
+	while(len--) *value++ = NRF_SPI_Transfer(NRF_CMD_NOP); 
 	// Kết thúc giao tiếp SPI
 	NRF_CSN_HIGH();
 }
@@ -117,7 +116,7 @@ void NRF_Flush_RX(void)
 {
 	// Xóa toàn bộ FIFO nhận để tránh đọc dữ liệu cũ/lỗi
 	NRF_CSN_LOW();
-	SPI_Transfer(NRF_CMD_FLUSH_RX);
+	NRF_SPI_Transfer(NRF_CMD_FLUSH_RX);
 	NRF_CSN_HIGH();
 }
 
@@ -126,7 +125,7 @@ void NRF_Flush_TX(void)
 {
 	// Xóa toàn bộ FIFO phát để chuẩn bị nạp payload mới
 	NRF_CSN_LOW();
-	SPI_Transfer(NRF_CMD_FLUSH_TX);
+	NRF_SPI_Transfer(NRF_CMD_FLUSH_TX);
 	NRF_CSN_HIGH();
 }
 
@@ -136,7 +135,7 @@ uint8_t NRF_ReadStatus(void)
 	uint8_t status;
 	// Đọc STATUS bằng cách clock 1 byte NOP khi CSN thấp
 	NRF_CSN_LOW();
-	status = SPI_Transfer(NRF_CMD_NOP); // đọc STATUS
+	status = NRF_SPI_Transfer(NRF_CMD_NOP); // đọc STATUS
 	NRF_CSN_HIGH();
 	return status;
 }
@@ -154,7 +153,7 @@ uint8_t NRF_ReadStatus(void)
  */
 void NRF_TX_Mode_Init(const uint8_t *addr, const uint8_t channel)
 {
-	SPI_Open(); // Mở SPI trước khi cấu hình NRF
+	NRF_SPI_Config(); // Mở SPI trước khi cấu hình NRF
 	delay_ms(20);
 	
 	// Bật CRC (1 hoặc 2 byte tùy CONFIG), PRIM_RX=0 (TX mode)
@@ -241,7 +240,7 @@ void NRF_SendData(uint8_t *data, uint8_t len)
  */
 void NRF_RX_Mode_Init(const uint8_t *addr, const uint8_t channel)
 {
-	SPI_Open(); // Mở SPI trước khi cấu hình NRF
+	NRF_SPI_Config(); // Mở SPI trước khi cấu hình NRF
 	delay_ms(20);
 	
 	// Bật CRC, chuyển về chế độ nhận (PRIM_RX)

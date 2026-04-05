@@ -1,7 +1,19 @@
 #include "rgbled_pwm.h"
 
-// Độ phân giải mặc định của PWM
-#define PERIOD  1000
+#if !defined(TEST_STM32)
+
+void RGBLed_PWM_Config(void)
+{
+	
+}
+
+void RGBLed_PWM_SetDuty(RGB_Led rgb_led)
+{
+	
+}
+
+#else
+
 #define PRESCALER 720
 
 #define RGB_PORT    GPIOA
@@ -11,7 +23,7 @@
 #define BLUE_PIN    GPIO_Pin_2
 
 
-void RGBLed_PWM_Open(void)
+void RGBLed_PWM_Config(void)
 {
   GPIO_InitTypeDef  				GPIO_InitStruct;
 	TIM_TimeBaseInitTypeDef   TIM_InitStruct;
@@ -28,7 +40,7 @@ void RGBLed_PWM_Open(void)
 	GPIO_Init(RGB_PORT, &GPIO_InitStruct);
 	
 	// Time base cho TIM2
-	TIM_InitStruct.TIM_Period = PERIOD-1;
+	TIM_InitStruct.TIM_Period = RGBLED_PWM_MAX_DUTY-1;
 	TIM_InitStruct.TIM_Prescaler = PRESCALER-1;
 	TIM_InitStruct.TIM_CounterMode = TIM_CounterMode_Up;
 	TIM_InitStruct.TIM_ClockDivision = 0;
@@ -52,12 +64,14 @@ void RGBLed_PWM_Open(void)
 
 void RGBLed_PWM_SetDuty(RGB_Led rgb_led)
 {
-	// Clamp giá trị duty để không vượt quá PERIOD
-	rgb_led.red_value 	= (rgb_led.red_value > PERIOD) 		? 	PERIOD : rgb_led.red_value;
-	rgb_led.green_value = (rgb_led.green_value > PERIOD) 	? 	PERIOD : rgb_led.green_value;
-	rgb_led.blue_value 	= (rgb_led.blue_value > PERIOD) 	? 	PERIOD : rgb_led.blue_value;
+	// Clamp giá trị duty để không vượt quá RGBLED_PWM_MAX_DUTY
+	rgb_led.red_value 	= (rgb_led.red_value > RGBLED_PWM_MAX_DUTY) 		? 	RGBLED_PWM_MAX_DUTY : rgb_led.red_value;
+	rgb_led.green_value = (rgb_led.green_value > RGBLED_PWM_MAX_DUTY) 	? 	RGBLED_PWM_MAX_DUTY : rgb_led.green_value;
+	rgb_led.blue_value 	= (rgb_led.blue_value > RGBLED_PWM_MAX_DUTY) 	? 	RGBLED_PWM_MAX_DUTY : rgb_led.blue_value;
 	
 	TIM2->CCR1 = rgb_led.blue_value;   // Kênh 1 . BLUE
 	TIM2->CCR2 = rgb_led.green_value;  // Kênh 2 . GREEN
 	TIM2->CCR3 = rgb_led.red_value;    // Kênh 3 . RED
 }
+
+#endif

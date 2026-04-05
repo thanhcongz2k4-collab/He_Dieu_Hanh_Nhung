@@ -3,6 +3,11 @@
 #ifdef __cplusplus
 extern "C"{
 #endif
+#include <stdlib.h>
+#include <stdint.h>
+#include "config.h"
+
+#if defined(TEST_STM32)
 #include "stm32f10x.h"                  // Device header
 
 #define CE_PIN 			GPIO_Pin_3
@@ -14,9 +19,10 @@ extern "C"{
 #define NRF_CSN_HIGH()  GPIOA->BSRR = CSN_PIN
 #define NRF_CSN_LOW()   GPIOA->BRR  = CSN_PIN
 
+#endif
 
-void SPI_Open(void);
-uint16_t SPI_Transfer(uint16_t data);
+void NRF_SPI_Config(void);
+uint16_t NRF_SPI_Transfer(uint16_t data);
 
 #ifdef __cplusplus
 }
