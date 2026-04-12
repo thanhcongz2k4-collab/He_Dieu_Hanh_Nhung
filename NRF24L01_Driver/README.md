@@ -11,21 +11,31 @@
 4. [Config.in](#4-configin)
 5. [nrf24_driver.mk](#5-nrf24_drivermk)
 6. [src/Makefile](#6-srcmakefile)
-7. [src/nrf24l01.c](#7-srcnrf24l01c)
+7. [src/nrf24l01.c — kernel driver](#7-srcnrf24l01c--kernel-driver)
 8. [Thêm vào package/Config.in tổng](#8-thêm-vào-packageconfigin-tổng)
 9. [Chọn package & Build](#9-chọn-package--build)
 10. [Test trên board](#10-test-trên-board)
 
 ### Phần 2 — Userspace Library
-11. [Cấu trúc thư mục](#11-cấu-trúc-thư-mục)
-12. [Config.in](#12-configin)
+11. [Cấu trúc thư mục](#11-cấu-trúc-thư-mục-1)
+12. [Config.in](#12-configin-1)
 13. [nrf24.mk](#13-nrf24mk)
 14. [src/nrf_spi/nrf_spi.h](#14-srcnrf_spinrf_spih)
 15. [src/nrf_spi/nrf_spi.c](#15-srcnrf_spinrf_spic)
 16. [src/nrf24l01/nrf24l01.h](#16-srcnrf24l01nrf24l01h)
 17. [src/nrf24l01/nrf24l01.c](#17-srcnrf24l01nrf24l01c)
-18. [Thêm vào package/Config.in tổng](#18-thêm-vào-packageconfigin-tổng)
-19. [Chọn package & Build](#19-chọn-package--build)
+18. [Thêm vào package/Config.in tổng](#18-thêm-vào-packageconfigin-tổng-1)
+19. [Chọn package & Build](#19-chọn-package--build-1)
+
+### Phần 3 — Application
+20. [Cấu trúc thư mục](#20-cấu-trúc-thư-mục-2)
+21. [Config.in](#21-configin-2)
+22. [nrf24_app.mk](#22-nrf24_appmk)
+23. [src/main.c — BBB RX app](#23-srcmainc--bbb-rx-app)
+24. [src/main.cpp — ESP32 TX app](#24-srcmaincpp--esp32-tx-app)
+25. [Thêm vào package/Config.in tổng](#25-thêm-vào-packageconfigin-tổng-2)
+26. [Chọn package & Build](#26-chọn-package--build-2)
+27. [Test trên board](#27-test-trên-board-1)
 
 ---
 
@@ -79,14 +89,26 @@ File: `output/build/linux-<ver>/arch/arm/boot/dts/ti/omap/am335x-boneblack.dts`
 Thêm vào cuối file:
 
 ```dts
+&am33xx_pinmux {
+    spi0_pins: spi0-pins {
+        pinctrl-single,pins = <
+            0x150 0x28 0x00  /* P9_22 SCLK  - PIN_INPUT  MODE0 */
+            0x154 0x28 0x00  /* P9_21 MISO  - PIN_INPUT  MODE0 */
+            0x158 0x08 0x00  /* P9_18 MOSI  - PIN_OUTPUT MODE0 */
+            0x15c 0x08 0x00  /* P9_17 CS0   - PIN_OUTPUT MODE0 */
+        >;
+    };
+};
+
 &spi0 {
     status = "okay";
+    pinctrl-names = "default";
+    pinctrl-0 = <&spi0_pins>;
     nrf24@0 {
         compatible = "nordic,nrf24l01";
-        reg = <0>;                                /* CS0 = P9_17 */
+        reg = <0>;                                /* CSN = P9_17 (CS0) */
         spi-max-frequency = <8000000>;
-        ce-gpios  = <&gpio1 16 GPIO_ACTIVE_HIGH>; /* CE  = P9_15 */
-        cs-gpios  = <&gpio1 28 GPIO_ACTIVE_LOW>;  /* CSN = P9_12 */
+        ce-gpios = <&gpio1 16 GPIO_ACTIVE_HIGH>;  /* CE  = P9_15 */
     };
 };
 ```
@@ -98,11 +120,10 @@ Thêm vào cuối file:
 | SCLK   | P9_22 | GPIO0_2  |
 | MOSI   | P9_18 | GPIO0_4  |
 | MISO   | P9_21 | GPIO0_3  |
-| CS0    | P9_17 | GPIO0_5  |
+| CSN    | P9_17 | GPIO0_5  |
 | CE     | P9_15 | GPIO1_16 |
-| CSN    | P9_12 | GPIO1_28 |
 
-> CS0 (P9_17) do SPI controller tự quản lý. CSN và CE là GPIO thủ công điều khiển qua ioctl.
+> CSN cắm vào P9_17 — SPI controller tự kéo qua CS0. CE cắm vào P9_15 — driver kéo qua GPIO ioctl.
 
 Sau khi sửa DTS phải rebuild:
 ```bash
@@ -135,6 +156,7 @@ config BR2_PACKAGE_NRF24_DRIVER
 NRF24_DRIVER_VERSION     = 1.0
 NRF24_DRIVER_SITE        = $(TOPDIR)/package/nrf24_driver/src
 NRF24_DRIVER_SITE_METHOD = local
+NRF24_DRIVER_LICENSE     = GPL-2.0
 
 define NRF24_DRIVER_BUILD_CMDS
     $(MAKE) -C $(LINUX_DIR) \
@@ -168,11 +190,9 @@ clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
 ```
 
-> `KDIR` được Buildroot truyền vào tự động qua `.mk`. Chỉ cần set thủ công khi build ngoài Buildroot.
-
 ---
 
-## 7. src/nrf24l01.c
+## 7. src/nrf24l01.c — kernel driver
 
 `package/nrf24_driver/src/nrf24l01.c`
 
@@ -190,15 +210,15 @@ clean:
 #define NRF_IOC_MAGIC   'n'
 #define NRF_IOC_CE_HIGH   _IO(NRF_IOC_MAGIC, 0)
 #define NRF_IOC_CE_LOW    _IO(NRF_IOC_MAGIC, 1)
-#define NRF_IOC_CSN_HIGH  _IO(NRF_IOC_MAGIC, 2)
-#define NRF_IOC_CSN_LOW   _IO(NRF_IOC_MAGIC, 3)
 
 static struct spi_device *nrf24_spi;
 static struct gpio_desc  *ce_gpio;
-static struct gpio_desc  *csn_gpio;
 static int                major;
 static struct class      *nrf24_class;
 static struct device     *nrf24_device;
+
+static u8     last_rx[64];
+static size_t last_rx_len;
 
 /* ── core transfer ───────────────────────────────────────── */
 
@@ -210,9 +230,12 @@ static int nrf24_transfer(const u8 *tx_buf, u8 *rx_buf, size_t len)
         .len    = len,
     };
     struct spi_message m;
+    int ret;
+
     spi_message_init(&m);
     spi_message_add_tail(&t, &m);
-    return spi_sync(nrf24_spi, &m);
+    ret = spi_sync(nrf24_spi, &m);
+    return ret;
 }
 
 /* ── fops ────────────────────────────────────────────────── */
@@ -220,38 +243,32 @@ static int nrf24_transfer(const u8 *tx_buf, u8 *rx_buf, size_t len)
 static ssize_t nrf24_write(struct file *file, const char __user *buf,
                            size_t len, loff_t *off)
 {
-    u8 tx[64], rx[64];
+    u8 tx[64];
     int ret;
 
     if (len > sizeof(tx)) len = sizeof(tx);
     if (copy_from_user(tx, buf, len)) return -EFAULT;
 
-    ret = nrf24_transfer(tx, rx, len);
-    return ret < 0 ? ret : (ssize_t)len;
+    ret = nrf24_transfer(tx, last_rx, len);
+    if (ret < 0) return ret;
+
+    last_rx_len = len;
+    return (ssize_t)len;
 }
 
 static ssize_t nrf24_read(struct file *file, char __user *buf,
                           size_t len, loff_t *off)
 {
-    u8 tx[64], rx[64];
-    int ret;
-
-    if (len > sizeof(rx)) len = sizeof(rx);
-    memset(tx, 0xFF, len);
-
-    ret = nrf24_transfer(tx, rx, len);
-    if (ret < 0) return ret;
-    if (copy_to_user(buf, rx, len)) return -EFAULT;
+    if (len > last_rx_len) len = last_rx_len;
+    if (copy_to_user(buf, last_rx, len)) return -EFAULT;
     return (ssize_t)len;
 }
 
 static long nrf24_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
     switch (cmd) {
-    case NRF_IOC_CE_HIGH:   gpiod_set_value(ce_gpio,  1); break;
-    case NRF_IOC_CE_LOW:    gpiod_set_value(ce_gpio,  0); break;
-    case NRF_IOC_CSN_HIGH:  gpiod_set_value(csn_gpio, 1); break;
-    case NRF_IOC_CSN_LOW:   gpiod_set_value(csn_gpio, 0); break;
+    case NRF_IOC_CE_HIGH:   gpiod_set_value(ce_gpio, 1); break;
+    case NRF_IOC_CE_LOW:    gpiod_set_value(ce_gpio, 0); break;
     default: return -EINVAL;
     }
     return 0;
@@ -268,19 +285,12 @@ static const struct file_operations fops = {
 
 static int nrf24_probe(struct spi_device *spi)
 {
-
     nrf24_spi = spi;
 
     ce_gpio = devm_gpiod_get(&spi->dev, "ce", GPIOD_OUT_LOW);
     if (IS_ERR(ce_gpio)) {
         dev_err(&spi->dev, "get ce-gpio failed: %ld\n", PTR_ERR(ce_gpio));
         return PTR_ERR(ce_gpio);
-    }
-
-    csn_gpio = devm_gpiod_get(&spi->dev, "cs", GPIOD_OUT_HIGH);
-    if (IS_ERR(csn_gpio)) {
-        dev_err(&spi->dev, "get csn-gpio failed: %ld\n", PTR_ERR(csn_gpio));
-        return PTR_ERR(csn_gpio);
     }
 
     major = register_chrdev(0, DEVICE_NAME, &fops);
@@ -340,19 +350,15 @@ MODULE_DESCRIPTION("nRF24L01 SPI driver for BeagleBone Black");
 MODULE_AUTHOR("rimuru");
 ```
 
-Driver expose `/dev/nrf24` với:
-- `write()` → gửi data ra MOSI
-- `read()` → nhận data từ MISO (clock dummy `0xFF`)
-- `ioctl()` → điều khiển CE / CSN GPIO
-
 #### ioctl commands
 
-| Command          | Value         | Tác dụng   |
-|------------------|---------------|------------|
-| NRF_IOC_CE_HIGH  | `_IO('n', 0)` | CE = HIGH  |
-| NRF_IOC_CE_LOW   | `_IO('n', 1)` | CE = LOW   |
-| NRF_IOC_CSN_HIGH | `_IO('n', 2)` | CSN = HIGH |
-| NRF_IOC_CSN_LOW  | `_IO('n', 3)` | CSN = LOW  |
+| Command         | Value         | Tác dụng  |
+|-----------------|---------------|-----------|
+| NRF_IOC_CE_HIGH | `_IO('n', 0)` | CE = HIGH |
+| NRF_IOC_CE_LOW  | `_IO('n', 1)` | CE = LOW  |
+
+> CSN được SPI controller tự kéo qua CS0 (P9_17) — không cần ioctl riêng.
+> `write()` gửi tx và lưu rx vào `last_rx`, `read()` trả về `last_rx` từ transaction trước.
 
 ---
 
@@ -390,6 +396,20 @@ ls /dev/nrf24
 Kết quả đúng:
 ```
 [  xx.xxxxxx] nrf24l01 spi0.0: nrf24 probe OK, major=248
+```
+
+Kiểm tra pinmux:
+```bash
+mount -t debugfs debugfs /sys/kernel/debug
+cat /sys/kernel/debug/pinctrl/44e10800.pinmux-pinctrl-single/pins | grep -E "pin 84|pin 85|pin 86|pin 87"
+```
+
+Kết quả đúng:
+```
+pin 84 ... 00000028
+pin 85 ... 00000028
+pin 86 ... 00000008
+pin 87 ... 00000008
 ```
 
 ---
@@ -480,8 +500,6 @@ $(eval $(generic-package))
 
 `package/nrf24/src/nrf_spi/nrf_spi.h`
 
-Hỗ trợ 2 platform qua macro `TEST_STM32`:
-
 ```c
 #ifndef __NRF_SPI__
 #define __NRF_SPI__
@@ -509,24 +527,24 @@ extern "C" {
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <stdio.h>
 
 #define NRF_IOC_MAGIC    'n'
 #define NRF_IOC_CE_HIGH  _IO(NRF_IOC_MAGIC, 0)
 #define NRF_IOC_CE_LOW   _IO(NRF_IOC_MAGIC, 1)
-#define NRF_IOC_CSN_HIGH _IO(NRF_IOC_MAGIC, 2)
-#define NRF_IOC_CSN_LOW  _IO(NRF_IOC_MAGIC, 3)
 
 extern int nrf_fd;
 
-#define NRF_CE_HIGH()   ioctl(nrf_fd, NRF_IOC_CE_HIGH,  0)
-#define NRF_CE_LOW()    ioctl(nrf_fd, NRF_IOC_CE_LOW,   0)
-#define NRF_CSN_HIGH()  ioctl(nrf_fd, NRF_IOC_CSN_HIGH, 0)
-#define NRF_CSN_LOW()   ioctl(nrf_fd, NRF_IOC_CSN_LOW,  0)
+#define NRF_CE_HIGH()   do { int r = ioctl(nrf_fd, NRF_IOC_CE_HIGH, 0); printf("CE HIGH ret=%d\n", r); } while(0)
+#define NRF_CE_LOW()    do { int r = ioctl(nrf_fd, NRF_IOC_CE_LOW,  0); printf("CE LOW  ret=%d\n", r); } while(0)
+#define NRF_CSN_HIGH()  /* kernel handles via CS0 */
+#define NRF_CSN_LOW()   /* kernel handles via CS0 */
 
 #endif /* TEST_STM32 */
 
 void    SPI_Open(void);
 uint8_t SPI_Transfer(uint8_t data);
+void    SPI_TransferBytes(const uint8_t *tx_buf, uint8_t *rx_buf, uint8_t len);
 
 #ifdef __cplusplus
 }
@@ -543,6 +561,7 @@ uint8_t SPI_Transfer(uint8_t data);
 
 ```c
 #include "nrf_spi.h"
+#include <stdio.h>
 
 #if defined(TEST_STM32)
 /* ── STM32 ──────────────────────────────────────────────── */
@@ -593,6 +612,16 @@ uint8_t SPI_Transfer(uint8_t data)
     return (uint8_t)SPI_I2S_ReceiveData(SPI1);
 }
 
+void SPI_TransferBytes(const uint8_t *tx_buf, uint8_t *rx_buf, uint8_t len)
+{
+    while (len--) {
+        uint8_t data = SPI_Transfer(*tx_buf++);
+        if (rx_buf) {
+            *rx_buf++ = data;
+        }
+    }
+}
+
 #else
 /* ── BeagleBone Black ───────────────────────────────────── */
 #include <stdint.h>
@@ -602,15 +631,35 @@ int nrf_fd = -1;
 void SPI_Open(void)
 {
     nrf_fd = open("/dev/nrf24", O_RDWR);
+    if (nrf_fd < 0) {
+        perror("open /dev/nrf24");
+        return;
+    }
+    printf("nrf_fd = %d\n", nrf_fd);
     NRF_CE_LOW();
     NRF_CSN_HIGH();
+}
+
+void SPI_TransferBytes(const uint8_t *tx_buf, uint8_t *rx_buf, uint8_t len)
+{
+    int w = write(nrf_fd, tx_buf, len);
+    if (w < 0) {
+        perror("write /dev/nrf24");
+        return;
+    }
+
+    if (rx_buf) {
+        int r = read(nrf_fd, rx_buf, len);
+        if (r < 0) {
+            perror("read /dev/nrf24");
+        }
+    }
 }
 
 uint8_t SPI_Transfer(uint8_t data)
 {
     uint8_t rx = 0;
-    if (write(nrf_fd, &data, 1) < 0) return 0;
-    if (read(nrf_fd,  &rx,   1) < 0) return 0;
+    SPI_TransferBytes(&data, &rx, 1);
     return rx;
 }
 
@@ -631,11 +680,8 @@ extern "C"{
 #endif
 #include <stdint.h>
 
-//#define TX_MODE
-
-
 #define ADDRESS_LENGTH  5
-#define PACKET_SIZE     32  
+#define PACKET_SIZE     32
 
 // SPI Commands
 #define NRF_CMD_R_REGISTER         0x00
@@ -730,7 +776,6 @@ extern "C"{
 #define FIFO_RX_FULL              0x02
 #define FIFO_RX_EMPTY             0x01
 
-
 // DYNPD Register Bits
 #define DPL_P5                    0x20
 #define DPL_P4                    0x10
@@ -744,8 +789,7 @@ extern "C"{
 #define EN_ACK_PAY                0x02
 #define EN_DYN_ACK                0x01
 
-
-void NRF_WriteCmd(uint8_t cmd,const uint8_t *value, uint8_t len);
+void NRF_WriteCmd(uint8_t cmd, const uint8_t *value, uint8_t len);
 void NRF_ReadCmd(uint8_t cmd, uint8_t *value, uint8_t len);
 
 void NRF_WriteReg_WithOneBit(uint8_t reg, uint8_t bit, uint8_t value);
@@ -754,29 +798,26 @@ uint8_t NRF_ReadReg_WithOneBit(uint8_t reg, uint8_t bit);
 void NRF_WriteReg_WithOneByte(uint8_t reg, uint8_t value);
 uint8_t NRF_ReadReg_WithOneByte(uint8_t reg);
 
-void NRF_WriteReg_WithMultiBytes(uint8_t reg,const uint8_t *data, uint8_t len);
+void NRF_WriteReg_WithMultiBytes(uint8_t reg, const uint8_t *data, uint8_t len);
 void NRF_ReadReg_WithMultiBytes(uint8_t reg, uint8_t *data, uint8_t len);
 
-
-#ifdef TX_MODE
 void NRF_TX_Mode_Init(const uint8_t *addr, const uint8_t channel);
 void NRF_SendData(uint8_t *data, uint8_t len);
 void NRF_Flush_TX(void);
 
-#else
 void NRF_RX_Mode_Init(const uint8_t *addr, const uint8_t channel);
 void NRF_StartListening(void);
 void NRF_StopListening(void);
 uint8_t NRF_DataReady(void);
 void NRF_ReadData(uint8_t *data, uint8_t len);
 void NRF_Flush_RX(void);
-#endif
+
+uint8_t NRF_ReadStatus(void);
 
 #ifdef __cplusplus
 }
 #endif
 #endif
-
 ```
 
 ---
@@ -784,7 +825,6 @@ void NRF_Flush_RX(void);
 ## 17. src/nrf24l01/nrf24l01.c
 
 `package/nrf24/src/nrf24l01/nrf24l01.c`
-
 
 ```c
 #include "nrf24l01.h"
@@ -799,339 +839,197 @@ void NRF_Flush_RX(void);
 #define delay_us(x) usleep(x)
 #endif
 
-/**
- * Gửi một lệnh (cmd) kèm dữ liệu tới NRF qua SPI.
- * - Trình tự: CSN=0 -> gửi cmd -> gửi len byte dữ liệu (nếu có) -> CSN=1
- *
- * Tham số:
- * - cmd  : mã lệnh NRF (ví dụ NRF_CMD_W_REGISTER | reg)
- * - value: con trỏ dữ liệu kèm theo
- * - len  : số byte dữ liệu kèm theo
- *
- * Lưu ý: Nhánh len==1 sẽ thực hiện lấy giá trị của value 
- * chứ không phải lấy giá trị tại địa chỉ chứa trong value.
- */
-void NRF_WriteCmd(uint8_t cmd,const uint8_t *value, uint8_t len)
+void NRF_WriteCmd(uint8_t cmd, const uint8_t *value, uint8_t len)
 {
-	// Kéo CSN xuống thấp để bắt đầu phiên SPI với NRF24L01
-	NRF_CSN_LOW();
-	// Gửi byte lệnh đầu tiên
-	SPI_Transfer(cmd);
-	if(len == 1)
-	{
-		// Trường hợp chỉ có 1 byte dữ liệu đính kèm lệnh
-		// Lưu ý: gọi SPI_Transfer(value) sẽ truyền giá trị con trỏ, không phải byte dữ liệu
-		SPI_Transfer(*value); 
-	}
-	else 
-	{
-		// Gửi lần lượt từng byte, sau mỗi lần gửi con trỏ tăng 1
-		while(len--) SPI_Transfer(*value++); 
-	}
-	// Kéo CSN lên cao để kết thúc phiên SPI
-	NRF_CSN_HIGH();
+    uint8_t tx[1 + PACKET_SIZE];
+
+    tx[0] = cmd;
+    if (len) {
+        memcpy(tx + 1, value, len);
+    }
+
+    NRF_CSN_LOW();
+    SPI_TransferBytes(tx, NULL, 1 + len);
+    NRF_CSN_HIGH();
 }
 
-/**
- * Đọc dữ liệu từ NRF bằng cách gửi cmd đọc rồi clock ra các byte bằng NOP.
- *
- * Tham số:
- * - cmd  : lệnh đọc (ví dụ NRF_CMD_R_REGISTER | reg)
- * - value: buffer đích để lưu dữ liệu đọc về
- * - len  : số byte cần đọc
- */
 void NRF_ReadCmd(uint8_t cmd, uint8_t *value, uint8_t len)
 {
-	// Bắt đầu giao tiếp SPI
-	NRF_CSN_LOW();
-	// Gửi lệnh đọc trước
-	SPI_Transfer(cmd);
-	// Mỗi byte nhận về tương ứng 1 lần clock ra một byte NOP
-	while(len--) *value++ = SPI_Transfer(NRF_CMD_NOP); 
-	// Kết thúc giao tiếp SPI
-	NRF_CSN_HIGH();
+    uint8_t tx[1 + PACKET_SIZE];
+    uint8_t rx[1 + PACKET_SIZE];
+    uint8_t i;
+
+    tx[0] = cmd;
+    for (i = 0; i < len; i++) {
+        tx[1 + i] = NRF_CMD_NOP;
+    }
+
+    NRF_CSN_LOW();
+    SPI_TransferBytes(tx, rx, 1 + len);
+    NRF_CSN_HIGH();
+
+    for (i = 0; i < len; i++) {
+        value[i] = rx[1 + i];
+    }
 }
 
-/** Ghi một thanh ghi 8-bit. */
-void NRF_WriteReg_WithOneByte(uint8_t reg, uint8_t value) 
+void NRF_WriteReg_WithOneByte(uint8_t reg, uint8_t value)
 {
-	// Ghi 1 byte vào thanh ghi: cmd = W_REGISTER | reg, dữ liệu là 1 byte
-	NRF_WriteCmd(NRF_CMD_W_REGISTER | reg, &value, 1);
+    NRF_WriteCmd(NRF_CMD_W_REGISTER | reg, &value, 1);
 }
 
-/** Đọc một thanh ghi 8-bit và trả về giá trị. */
-uint8_t NRF_ReadReg_WithOneByte(uint8_t reg) 
+uint8_t NRF_ReadReg_WithOneByte(uint8_t reg)
 {
-	uint8_t data;
-	// Đọc 1 byte từ thanh ghi: cmd = R_REGISTER | reg
-	NRF_ReadCmd(NRF_CMD_R_REGISTER | reg, &data, 1);
-	// Trả về giá trị đọc được
-	return data;
+    uint8_t data;
+    NRF_ReadCmd(NRF_CMD_R_REGISTER | reg, &data, 1);
+    return data;
 }
 
-/**
- * Set/Clear một bit trong thanh ghi 8-bit.
- * - value=1 -> set bit; value=0 -> clear bit.
- */
 void NRF_WriteReg_WithOneBit(uint8_t reg, uint8_t bit, uint8_t value)
 {
-	// 1) Đọc giá trị hiện tại của thanh ghi
-	uint8_t reg_value = NRF_ReadReg_WithOneByte(reg);
-
-	// 2) Set/Clear bit theo tham số value
-	reg_value = value ? (reg_value | bit) : (reg_value & ~bit);
-
-	// 3) Ghi trả lại thanh ghi với giá trị mới
-	NRF_WriteReg_WithOneByte(reg, reg_value);
+    uint8_t reg_value = NRF_ReadReg_WithOneByte(reg);
+    reg_value = value ? (reg_value | bit) : (reg_value & ~bit);
+    NRF_WriteReg_WithOneByte(reg, reg_value);
 }
 
-/** Kiểm tra một bit trong thanh ghi 8-bit, trả về 1 nếu đang set, ngược lại 0. */
 uint8_t NRF_ReadReg_WithOneBit(uint8_t reg, uint8_t bit)
 {
-	uint8_t reg_value = NRF_ReadReg_WithOneByte(reg);
-	// Trả về 1 nếu bit được set, ngược lại 0
-	return (reg_value & bit) && 1;
+    uint8_t reg_value = NRF_ReadReg_WithOneByte(reg);
+    return (reg_value & bit) && 1;
 }
 
-/** Ghi nhiều byte vào một thanh ghi (ví dụ địa chỉ TX/RX). */
-void NRF_WriteReg_WithMultiBytes(uint8_t reg,const uint8_t *data, uint8_t len) 
+void NRF_WriteReg_WithMultiBytes(uint8_t reg, const uint8_t *data, uint8_t len)
 {
-	// Ghi nhiều byte liền kề (ví dụ địa chỉ 3-5 byte)
-	NRF_WriteCmd(NRF_CMD_W_REGISTER | reg, data, len);
+    NRF_WriteCmd(NRF_CMD_W_REGISTER | reg, data, len);
 }
 
-/** Đọc nhiều byte từ một thanh ghi (ví dụ địa chỉ TX/RX). */
-void NRF_ReadReg_WithMultiBytes(uint8_t reg, uint8_t *data, uint8_t len) 
+void NRF_ReadReg_WithMultiBytes(uint8_t reg, uint8_t *data, uint8_t len)
 {
-	// Đọc nhiều byte liên tiếp từ một thanh ghi bắt đầu tại reg
-	NRF_ReadCmd(NRF_CMD_R_REGISTER | reg, data, len);
+    NRF_ReadCmd(NRF_CMD_R_REGISTER | reg, data, len);
 }
 
-
-/** Flush FIFO RX (xóa dữ liệu hàng đợi nhận). */
 void NRF_Flush_RX(void)
 {
-	// Xóa toàn bộ FIFO nhận để tránh đọc dữ liệu cũ/lỗi
-	NRF_CSN_LOW();
-	SPI_Transfer(NRF_CMD_FLUSH_RX);
-	NRF_CSN_HIGH();
+    NRF_CSN_LOW();
+    SPI_Transfer(NRF_CMD_FLUSH_RX);
+    NRF_CSN_HIGH();
 }
 
-/** Flush FIFO TX (xóa dữ liệu hàng đợi phát). */
 void NRF_Flush_TX(void)
 {
-	// Xóa toàn bộ FIFO phát để chuẩn bị nạp payload mới
-	NRF_CSN_LOW();
-	SPI_Transfer(NRF_CMD_FLUSH_TX);
-	NRF_CSN_HIGH();
+    NRF_CSN_LOW();
+    SPI_Transfer(NRF_CMD_FLUSH_TX);
+    NRF_CSN_HIGH();
 }
 
-/** Đọc thanh ghi STATUS bằng cách clock lệnh NOP; trả về byte STATUS. */
 uint8_t NRF_ReadStatus(void)
 {
-	uint8_t status;
-	// Đọc STATUS bằng cách clock 1 byte NOP khi CSN thấp
-	NRF_CSN_LOW();
-	status = SPI_Transfer(NRF_CMD_NOP); // đọc STATUS
-	NRF_CSN_HIGH();
-	return status;
+    uint8_t status;
+    NRF_CSN_LOW();
+    status = SPI_Transfer(NRF_CMD_NOP);
+    NRF_CSN_HIGH();
+    return status;
 }
 
-/*------------------------------------------ TX Mode ------------------------------------------*/
-#ifdef TX_MODE
-
-/**
- * Khởi tạo NRF ở chế độ TX (phát): bật CRC, Auto-ACK, cấu hình địa chỉ/kênh,
- * set payload width, clear cờ STATUS, flush TX, về PWR_UP và CE thấp.
- *
- * Tham số:
- * - addr   : địa chỉ 5 byte cho TX_ADDR và RX_ADDR_P0 (dùng Auto-ACK)
- * - channel: kênh RF (0..127)
- */
 void NRF_TX_Mode_Init(const uint8_t *addr, const uint8_t channel)
 {
-	SPI_Open(); // Mở SPI trước khi cấu hình NRF
-	delay_ms(20);
-	
-	// Bật CRC (1 hoặc 2 byte tùy CONFIG), PRIM_RX=0 (TX mode)
-	NRF_WriteReg_WithOneByte(NRF_REG_CONFIG, 				CONFIG_EN_CRC); // CONFIG: EN_CRC = 1
-	// Bật Auto-ACK cho pipe 0
-	NRF_WriteReg_WithOneByte(NRF_REG_EN_AA, 				ENAA_P0); // EN_AA: auto-ack
-	// Bật địa chỉ pipe 0
-	NRF_WriteReg_WithOneByte(NRF_REG_EN_RXADDR, 		ERX_P0); // EN_RXADDR: enable pipe0
-	// Thiết lập độ dài địa chỉ (5 byte): theo datasheet lưu dưới dạng (width-2)
-	NRF_WriteReg_WithOneByte(NRF_REG_SETUP_AW, 			(ADDRESS_LENGTH - 0x02)); // SETUP_AW: 5 bytes addr
-	// Thiết lập tự động retry: delay ~1000us, tối đa 15 lần
-	NRF_WriteReg_WithOneByte(NRF_REG_SETUP_RETR, 		0x3f); // SETUP_RETR: 1000us, 15 retries
-	// Chọn kênh RF (0..127)
-	NRF_WriteReg_WithOneByte(NRF_REG_RF_CH, 				channel & 0x7F);   // RF_CH: channel
-	
-	// Ghi địa chỉ phát (TX_ADDR)
-	NRF_WriteReg_WithMultiBytes(NRF_REG_TX_ADDR, addr, ADDRESS_LENGTH); 
-	
-	// RX_ADDR_P0 phải trùng với địa chỉ TX để Auto-ACK hoạt động
-	NRF_WriteReg_WithMultiBytes(NRF_REG_RX_ADDR_P0, addr, ADDRESS_LENGTH); 
-	
-	// Cấu hình kích thước payload cố định cho pipe0
-	NRF_WriteReg_WithOneByte(NRF_REG_RX_PW_P0, PACKET_SIZE);  
-	
-	// Clear cờ trong STATUS
-	NRF_WriteReg_WithOneByte(NRF_REG_STATUS, 		STATUS_RX_DR | STATUS_TX_DS | STATUS_MAX_RT);
-	
-	NRF_Flush_TX();
-	
-	// TX mode: CE = 0, chỉ pulse khi gửi
-	NRF_CE_LOW();
+    SPI_Open();
+    delay_ms(20);
 
-	// Bật nguồn RF (PWR_UP) và đợi mạch ổn định
-	NRF_WriteReg_WithOneBit(NRF_REG_CONFIG, CONFIG_PWR_UP, 1); // CONFIG: PWR_UP=1
-	delay_ms(10);
+    NRF_WriteReg_WithOneByte(NRF_REG_CONFIG,      CONFIG_EN_CRC | CONFIG_PWR_UP);
+    NRF_WriteReg_WithOneByte(NRF_REG_EN_AA,        ENAA_P0);
+    NRF_WriteReg_WithOneByte(NRF_REG_EN_RXADDR,    ERX_P0);
+    NRF_WriteReg_WithOneByte(NRF_REG_SETUP_AW,     (ADDRESS_LENGTH - 0x02));
+    NRF_WriteReg_WithOneByte(NRF_REG_SETUP_RETR,   0x3f);
+    NRF_WriteReg_WithOneByte(NRF_REG_RF_CH,        channel & 0x7F);
+    NRF_WriteReg_WithMultiBytes(NRF_REG_TX_ADDR,    addr, ADDRESS_LENGTH);
+    NRF_WriteReg_WithMultiBytes(NRF_REG_RX_ADDR_P0, addr, ADDRESS_LENGTH);
+    NRF_WriteReg_WithOneByte(NRF_REG_RX_PW_P0,     PACKET_SIZE);
+    NRF_WriteReg_WithOneByte(NRF_REG_STATUS,       STATUS_RX_DR | STATUS_TX_DS | STATUS_MAX_RT);
+    NRF_Flush_TX();
+    NRF_CE_LOW();
+    delay_ms(10);
 }
 
-/**
- * Gửi một gói dữ liệu ở TX mode.
- * - Clamp độ dài về PACKET_SIZE, ghi payload vào FIFO TX (W_TX_PAYLOAD),
- *   pulse CE >= ~10us để phát, chờ TX_DS hoặc MAX_RT rồi xóa cờ STATUS.
- */
-void NRF_SendData(uint8_t *data, uint8_t len) 
+void NRF_SendData(uint8_t *data, uint8_t len)
 {
-	uint8_t temp[PACKET_SIZE];
-	// Đảm bảo CE thấp trước khi nạp payload TX
-	NRF_CE_LOW();
+    uint8_t temp[PACKET_SIZE];
+    NRF_CE_LOW();
+    NRF_Flush_TX();
 
-	// Xóa FIFO TX để tránh chèn payload vào hàng đợi cũ
-	NRF_Flush_TX();
+    len = len > PACKET_SIZE ? PACKET_SIZE : len;
+    memset(temp, 0, PACKET_SIZE);
+    memmove(temp, data, len);
+    NRF_WriteCmd(NRF_CMD_W_TX_PAYLOAD, temp, PACKET_SIZE);
 
-	// Giới hạn độ dài về PACKET_SIZE
-	len = len > PACKET_SIZE ? PACKET_SIZE : len;
-	// Điền 0 phần còn lại để đủ kích thước cố định
-	memset(temp, 0, PACKET_SIZE);
-	// Sao chép dữ liệu người dùng vào buffer tạm
-	memmove(temp, data, len);
-	// Nạp payload vào FIFO TX
-	NRF_WriteCmd(NRF_CMD_W_TX_PAYLOAD, temp, PACKET_SIZE);
+    NRF_CE_HIGH();
+    delay_us(50);
+    NRF_CE_LOW();
 
-	// Pulse CE để phát
-	NRF_CE_HIGH();
-	// Giữ CE mức cao tối thiểu ~10us để bắt đầu truyền
-	delay_us(50); // delay ngắn ~10us
-	NRF_CE_LOW();
-
-	// Đợi TX_DS hoặc MAX_RT
-	while (!(NRF_ReadStatus() & (STATUS_TX_DS | STATUS_MAX_RT)));
-
-	// Xóa cờ
-	NRF_WriteReg_WithOneByte(NRF_REG_STATUS, 0x70);
+    int timeout = 2000;
+    while (!(NRF_ReadStatus() & (STATUS_TX_DS | STATUS_MAX_RT))) {
+        usleep(1000);
+        if (--timeout == 0) {
+            printf("TIMEOUT STATUS=0x%02x\n", NRF_ReadStatus());
+            NRF_WriteReg_WithOneByte(NRF_REG_STATUS, 0x70);
+            return;
+        }
+    }
+    NRF_WriteReg_WithOneByte(NRF_REG_STATUS, 0x70);
 }
 
-/*------------------------------------------ RX Mode ------------------------------------------*/
-#else
-
-/**
- * Khởi tạo NRF ở chế độ RX (nghe/nhận): bật CRC, PRIM_RX, Auto-ACK, địa chỉ,
- * kênh, RF_SETUP, payload width; clear cờ STATUS, bật PWR_UP, flush RX, CE=1.
- *
- * Tham số:
- * - addr   : địa chỉ 5 byte cho RX_ADDR_P0 (và TX_ADDR để ACK trả về)
- * - channel: kênh RF (0..127)
- */
 void NRF_RX_Mode_Init(const uint8_t *addr, const uint8_t channel)
 {
-	SPI_Open(); // Mở SPI trước khi cấu hình NRF
-	delay_ms(20);
-	
-	// Bật CRC, chuyển về chế độ nhận (PRIM_RX)
-	NRF_WriteReg_WithOneByte(NRF_REG_CONFIG,				CONFIG_EN_CRC | CONFIG_PRIM_RX); // CONFIG: EN_CRC = 1, PWR_UP=1, PRIM_RX=1
-	// Bật Auto-ACK cho pipe 0
-	NRF_WriteReg_WithOneByte(NRF_REG_EN_AA,					ENAA_P0); // EN_AA: auto-ack
-	// Bật địa chỉ pipe 0
-	NRF_WriteReg_WithOneByte(NRF_REG_EN_RXADDR,			ERX_P0); // EN_RXADDR: enable pipe0
-	// Độ dài địa chỉ = 5 byte
-	NRF_WriteReg_WithOneByte(NRF_REG_SETUP_AW,			(ADDRESS_LENGTH - 0x02)); // SETUP_AW: 5 bytes addr
-	// Retry dùng cho chế độ TX (cũng thiết lập trước)
-	NRF_WriteReg_WithOneByte(NRF_REG_SETUP_RETR,		0x3f); // SETUP_RETR: 1000us, 15 retries
-	// Kênh RF
-	NRF_WriteReg_WithOneByte(NRF_REG_RF_CH,					channel & 0x7F);   // RF_CH: channel
-	// Tốc độ 1Mbps, công suất 0dBm (0x0f phụ thuộc cấu hình DATASHEET)
-	NRF_WriteReg_WithOneByte(NRF_REG_RF_SETUP,			0x0f); // RF_SETUP: 1Mbps, 0dBm
-	
-	// Thiết lập TX_ADDR (dùng cho trả ACK) và RX_ADDR_P0 trùng nhau
-	NRF_WriteReg_WithMultiBytes(NRF_REG_TX_ADDR, addr, ADDRESS_LENGTH); 
-	
-	NRF_WriteReg_WithMultiBytes(NRF_REG_RX_ADDR_P0, addr, ADDRESS_LENGTH); 
-	
-	// Set payload width cho pipe0 (32 byte)
-	NRF_WriteReg_WithOneByte(NRF_REG_RX_PW_P0, PACKET_SIZE); 
-	
-	// Clear interrupt flags trong STATUS
-	NRF_WriteReg_WithOneByte(NRF_REG_STATUS,  	(STATUS_RX_DR | STATUS_TX_DS | STATUS_MAX_RT));
-	
-	// Bật nguồn RF
-	NRF_WriteReg_WithOneBit(NRF_REG_CONFIG,	CONFIG_PWR_UP, 1);
-	delay_ms(10);
-	
-	// Đảm bảo FIFO RX sạch trước khi bắt đầu lắng nghe
-	NRF_Flush_RX();
+    SPI_Open();
+    delay_ms(20);
 
-	NRF_StopListening();
+    NRF_WriteReg_WithOneByte(NRF_REG_CONFIG,      CONFIG_EN_CRC | CONFIG_PRIM_RX);
+    NRF_WriteReg_WithOneByte(NRF_REG_EN_AA,        ENAA_P0);
+    NRF_WriteReg_WithOneByte(NRF_REG_EN_RXADDR,    ERX_P0);
+    NRF_WriteReg_WithOneByte(NRF_REG_SETUP_AW,     (ADDRESS_LENGTH - 0x02));
+    NRF_WriteReg_WithOneByte(NRF_REG_SETUP_RETR,   0x3f);
+    NRF_WriteReg_WithOneByte(NRF_REG_RF_CH,        channel & 0x7F);
+    NRF_WriteReg_WithOneByte(NRF_REG_RF_SETUP,     0x0f);
+    NRF_WriteReg_WithMultiBytes(NRF_REG_TX_ADDR,    addr, ADDRESS_LENGTH);
+    NRF_WriteReg_WithMultiBytes(NRF_REG_RX_ADDR_P0, addr, ADDRESS_LENGTH);
+    NRF_WriteReg_WithOneByte(NRF_REG_RX_PW_P0,     PACKET_SIZE);
+    NRF_WriteReg_WithOneByte(NRF_REG_STATUS,       (STATUS_RX_DR | STATUS_TX_DS | STATUS_MAX_RT));
+    NRF_WriteReg_WithOneBit(NRF_REG_CONFIG,        CONFIG_PWR_UP, 1);
+    delay_ms(10);
+    NRF_Flush_RX();
+    NRF_StopListening();
 }
 
-/** Bắt đầu lắng nghe (CE = 1 ở RX mode). */
 void NRF_StartListening(void)
 {
-	// Kéo CE lên cao để bắt đầu lắng nghe (PRX)
-	NRF_CE_HIGH();
+    NRF_CE_HIGH();
 }
 
-/** Dừng lắng nghe (CE = 0). */
 void NRF_StopListening(void)
 {
-	// Kéo CE xuống thấp để dừng lắng nghe
-	NRF_CE_LOW();
+    NRF_CE_LOW();
 }
 
-
-/** Trả về khác 0 nếu có dữ liệu sẵn (cờ RX_DR set). */
-uint8_t NRF_DataReady(void) 
+uint8_t NRF_DataReady(void)
 {
-	uint8_t status = NRF_ReadStatus();
-	// Kiểm tra cờ RX_DR; lưu ý không cho biết pipe nào, muốn biết pipe cần đọc RX_P_NO
-	return status & STATUS_RX_DR;
+    uint8_t status = NRF_ReadStatus();
+    return status & STATUS_RX_DR;
 }
 
-/** Đọc payload từ FIFO RX (R_RX_PAYLOAD). */
 void NRF_Read_RX_Payload(uint8_t *data, uint8_t len)
 {
-	// Đọc ra len byte từ đầu FIFO RX; nếu len < kích thước payload, phần còn lại vẫn nằm trong FIFO
-	NRF_ReadCmd(NRF_CMD_R_RX_PAYLOAD, data, len);
+    NRF_ReadCmd(NRF_CMD_R_RX_PAYLOAD, data, len);
 }
 
-/**
- * Đọc dữ liệu cấp cao:
- * - Luôn đọc PACKET_SIZE byte vào buffer tạm
- * - Sao chép tối đa len byte ra buffer người dùng
- * - Xóa cờ RX_DR sau khi đọc
- */
-void NRF_ReadData(uint8_t *data, uint8_t len) 
+void NRF_ReadData(uint8_t *data, uint8_t len)
 {
-	uint8_t temp[PACKET_SIZE];
-	// Luôn đọc đủ PACKET_SIZE từ FIFO RX vào buffer tạm
-	NRF_Read_RX_Payload(temp, PACKET_SIZE);
-
-	// Chỉ copy tối đa len byte cho người gọi
-	len = len > PACKET_SIZE ? PACKET_SIZE : len;
-	memmove(data, temp, len);
-
-	// Xóa cờ RX_DR
-	NRF_WriteReg_WithOneByte(NRF_REG_STATUS, STATUS_RX_DR);
+    uint8_t temp[PACKET_SIZE];
+    NRF_Read_RX_Payload(temp, PACKET_SIZE);
+    len = len > PACKET_SIZE ? PACKET_SIZE : len;
+    memmove(data, temp, len);
+    NRF_WriteReg_WithOneByte(NRF_REG_STATUS, STATUS_RX_DR);
 }
-
-#endif
 ```
-
-
-> `TEST_STM32` không được define khi build với Buildroot → tự động dùng code BBB.
-> Để build cho STM32: thêm `-DTEST_STM32` vào CFLAGS.
 
 ---
 
@@ -1153,18 +1051,258 @@ Tìm `/` → `nrf24` → bật.
 
 ```bash
 make nrf24-build
-make
+make nrf24-install-staging
 ```
+
 Kiểm tra staging:
 ```bash
 ls output/staging/usr/lib/libnrf24*
 ls output/staging/usr/include/nrf*
 ```
 
-Kết quả đúng:
+---
+---
+
+# Phần 3 — Application
+
+## 20. Cấu trúc thư mục
+
 ```
-output/staging/usr/lib/libnrf24.a
-output/staging/usr/lib/libnrf24.so
-output/staging/usr/include/nrf24l01.h
-output/staging/usr/include/nrf_spi.h
+package/nrf24_app/
+├── Config.in
+├── nrf24_app.mk
+└── src/
+    └── main.c          ← BBB (RX mode)
+
+ESP32/
+└── src/
+    └── main.cpp        ← ESP32 (TX hoặc RX mode)
 ```
+
+---
+
+## 21. Config.in
+
+`package/nrf24_app/Config.in`
+
+```
+config BR2_PACKAGE_NRF24_APP
+    bool "nrf24_app"
+    depends on BR2_PACKAGE_NRF24
+    help
+      nRF24L01 test application for BeagleBone Black
+```
+
+---
+
+## 22. nrf24_app.mk
+
+`package/nrf24_app/nrf24_app.mk`
+
+```makefile
+NRF24_APP_VERSION     = 1.0
+NRF24_APP_SITE        = $(TOPDIR)/package/nrf24_app/src
+NRF24_APP_SITE_METHOD = local
+NRF24_APP_DEPENDENCIES = nrf24
+
+define NRF24_APP_BUILD_CMDS
+    $(TARGET_CC) $(TARGET_CFLAGS) \
+        -I$(STAGING_DIR)/usr/include \
+        $(@D)/main.c \
+        -L$(STAGING_DIR)/usr/lib \
+        -Wl,-Bstatic -lnrf24 -Wl,-Bdynamic \
+        -o $(@D)/nrf24_app
+endef
+
+define NRF24_APP_INSTALL_TARGET_CMDS
+    $(INSTALL) -D -m 0755 $(@D)/nrf24_app \
+        $(TARGET_DIR)/usr/bin/nrf24_app
+endef
+
+$(eval $(generic-package))
+```
+
+---
+
+## 23. src/main.c — BBB RX app
+
+`package/nrf24_app/src/main.c`
+
+```c
+#include "nrf24l01.h"
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+static const uint8_t addr[]  = {0xE7, 0xE7, 0xE7, 0xE7, 0xE7};
+static const uint8_t channel = 40;
+
+int main(void)
+{
+    printf("nRF24L01 RX init...\n");
+    NRF_RX_Mode_Init(addr, channel);
+    NRF_StartListening();
+    printf("Listening...\n");
+
+    /* Debug: In ra các register quan trọng */
+    printf("CONFIG=0x%02x\n",   NRF_ReadReg_WithOneByte(NRF_REG_CONFIG));
+    printf("RF_SETUP=0x%02x\n", NRF_ReadReg_WithOneByte(NRF_REG_RF_SETUP));
+    printf("RF_CH=0x%02x\n",    NRF_ReadReg_WithOneByte(NRF_REG_RF_CH));
+    printf("STATUS=0x%02x\n",   NRF_ReadStatus());
+
+    while (1) {
+        uint8_t status = NRF_ReadStatus();
+        if (status & STATUS_RX_DR) {
+            printf("STATUS before read: 0x%02x\n", status);
+
+            uint8_t data[PACKET_SIZE];
+            memset(data, 0, PACKET_SIZE);
+            NRF_ReadData(data, PACKET_SIZE);
+
+            printf("Received: ");
+            for (uint8_t i = 0; i < PACKET_SIZE; i++) {
+                printf("%02X ", data[i]);
+            }
+            printf("\n");
+            printf("Text: %s\n", (char *)data);
+            printf("STATUS after read: 0x%02x\n", NRF_ReadStatus());
+        }
+        usleep(100000);
+    }
+    return 0;
+}
+```
+
+---
+
+## 24. src/main.cpp — ESP32 TX app
+
+`ESP32/src/main.cpp`
+
+PlatformIO `platformio.ini`:
+```ini
+[env:esp32doit-devkit-v1]
+platform = espressif32
+board = esp32doit-devkit-v1
+framework = arduino
+monitor_speed = 115200
+lib_deps = nRF24/RF24
+```
+
+```cpp
+#include <Arduino.h>
+#include <stdio.h>
+#include <string.h>
+#include "nrf24l01.h"
+#include "nrf_spi.h"
+
+/* Chọn chế độ: */
+#define ROLE_TX
+// #define ROLE_RX
+
+static const uint8_t addr[ADDRESS_LENGTH] = {0xE7, 0xE7, 0xE7, 0xE7, 0xE7};
+static const uint8_t channel = 40;
+
+void setup() {
+    Serial.begin(115200);
+    while (!Serial) { delay(10); }
+
+#if defined(ROLE_TX)
+    Serial.println("NRF24L01 ESP32 mode: TX");
+#else
+    Serial.println("NRF24L01 ESP32 mode: RX");
+#endif
+
+    SPI_Open();
+
+#if defined(ROLE_TX)
+    NRF_TX_Mode_Init(addr, channel);
+    Serial.printf("CONFIG=0x%02x\n",   NRF_ReadReg_WithOneByte(NRF_REG_CONFIG));
+    Serial.printf("RF_SETUP=0x%02x\n", NRF_ReadReg_WithOneByte(NRF_REG_RF_SETUP));
+    Serial.printf("RF_CH=0x%02x\n",    NRF_ReadReg_WithOneByte(NRF_REG_RF_CH));
+    Serial.printf("STATUS=0x%02x\n",   NRF_ReadStatus());
+#else
+    NRF_RX_Mode_Init(addr, channel);
+    NRF_StartListening();
+#endif
+}
+
+void loop() {
+#if defined(ROLE_TX)
+    uint8_t packet[PACKET_SIZE];
+    memset(packet, 0, PACKET_SIZE);
+    snprintf((char *)packet, PACKET_SIZE, "ESP32 packet %lu", millis() / 1000);
+    Serial.printf("Sending: %s\n", (char *)packet);
+    NRF_SendData(packet, PACKET_SIZE);
+    Serial.println("Packet sent.");
+    delay(1000);
+#else
+    if (NRF_DataReady()) {
+        uint8_t data[PACKET_SIZE];
+        memset(data, 0, PACKET_SIZE);
+        NRF_ReadData(data, PACKET_SIZE);
+        Serial.print("Received: ");
+        for (uint8_t i = 0; i < PACKET_SIZE; i++) {
+            Serial.printf("%02X ", data[i]);
+        }
+        Serial.println();
+        Serial.print("Text: ");
+        Serial.println((char *)data);
+    }
+    delay(100);
+#endif
+}
+```
+
+> ESP32 dùng lại thư viện `nrf24l01.h/c` và `nrf_spi.h/c` — cần port `nrf_spi` cho ESP32 SPI API.
+
+---
+
+## 25. Thêm vào package/Config.in tổng
+
+```
+source "package/nrf24_app/Config.in"
+```
+
+---
+
+## 26. Chọn package & Build
+
+```bash
+make menuconfig
+```
+
+Tìm `/` → `nrf24_app` → bật.
+
+```bash
+make nrf24_app-build
+make
+```
+
+---
+
+## 27. Test trên board
+
+```bash
+insmod /lib/modules/nrf24l01.ko
+nrf24_app
+```
+
+Kết quả đúng khi nhận được data từ ESP32:
+```
+Listening...
+CONFIG=0x0b
+STATUS before read: 0x4e
+Received: 45 53 50 33 32 20 70 61 63 6B ...
+Text: ESP32 packet 5
+STATUS after read: 0x0e
+```
+
+---
+
+## Ghi chú
+
+- `TEST_STM32` không được define khi build với Buildroot → tự động dùng code BBB.
+- Mỗi lần sửa DTS phải xóa DTB cũ và `make linux-rebuild` rồi flash lại `sdcard.img`.
+- `NRF_CSN_HIGH/LOW` trên BBB là no-op — SPI controller tự kéo CS0 (P9_17).
+- CE GPIO = gpio-528 (P9_15A) trên BBB kernel mới.
