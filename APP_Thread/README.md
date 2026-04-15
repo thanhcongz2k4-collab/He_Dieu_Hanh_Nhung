@@ -60,46 +60,43 @@ buildroot/
 ### `package/app/Config.in`
 ```
 config BR2_PACKAGE_APP
-    bool "app"
-    depends on BR2_USE_MMU
-    depends on BR2_PACKAGE_OLED
-    depends on BR2_PACKAGE_MQTT
-    select BR2_PACKAGE_CJSON
-    help
-      RGB LED controller application for BeagleBone.
-      Receives RGB data via NRF24L01, displays on OLED,
-      and publishes/subscribes via MQTT.
+	bool "app"
+	depends on BR2_USE_MMU
+	depends on BR2_PACKAGE_OLED
+	depends on BR2_PACKAGE_MQTT
+	depends on BR2_PACKAGE_NRF24
+	select BR2_PACKAGE_CJSON   
+	help
+	  RGB LED controller application for BeagleBone.
+	  Receives RGB data via NRF24L01, displays on OLED,
+	  and publishes/subscribes via MQTT.
 ```
 
 ### `package/app/app.mk`
 ```makefile
-################################################################################
-#
-# app
-#
-################################################################################
 
 APP_VERSION      = 1.0.0
 APP_SITE         = $(TOPDIR)/package/app/src
 APP_SITE_METHOD  = local
 
 APP_LICENSE          = PROPRIETARY
-APP_DEPENDENCIES     = oled mqtt cjson
+APP_DEPENDENCIES = oled mqtt cjson
 
 define APP_BUILD_CMDS
-    $(TARGET_CC) $(TARGET_CFLAGS) \
-        -I$(STAGING_DIR)/usr/include \
-        $(@D)/main.c \
-        -o $(@D)/app \
-        -L$(STAGING_DIR)/usr/lib \
-        -loled -lmqtt -lcjson -lpthread
+	$(TARGET_CC) $(TARGET_CFLAGS) \
+		-I$(STAGING_DIR)/usr/include \
+		$(@D)/main.c \
+		-o $(@D)/app \
+		-L$(STAGING_DIR)/usr/lib \
+		-loled -lmqtt -lcjson -lpthread -lnrf24
 endef
 
 define APP_INSTALL_TARGET_CMDS
-    $(INSTALL) -D -m 0755 $(@D)/app $(TARGET_DIR)/usr/bin/app
+	$(INSTALL) -D -m 0755 $(@D)/app $(TARGET_DIR)/usr/bin/app
 endef
 
 $(eval $(generic-package))
+
 ```
 
 ---
@@ -121,56 +118,81 @@ $(eval $(generic-package))
 #include <unistd.h>
 #include <cjson/cJSON.h>
 #include "oled.h"
-// #include "nrf24l01.h"   // TODO: chưa có package
-// #include "rgb_led.h"    // TODO: chưa có package
+#include "nrf24l01.h"
+// #include "rgb_led.h"
 #include "mqtt.h"
 
-#define MQTT_TOPIC  "BeagleBone/RGB"
+#define DEVICE "/dev/btn"
+
+#define MQTT_TOPIC_PUB  "BeagleBone/RGB/status"   // BBB gửi lên
+#define MQTT_TOPIC_SUB  "BeagleBone/RGB/set"       // BBB nhận lệnh
 
 #endif // __ALL_HEADER_H__
+
 ```
 
 ### `src/main.c`
 ```c
 #include "all_header.h"
 
+// Định nghĩa hàm msleep để ngủ theo đơn vị milliseconds
 #define msleep(x) usleep((x) * 1000)
+volatile int button_flag = 0;
 
 enum {
-    IDLE_TASK_PRIORITY         = 0,
-    MQTT_TASK_PRIORITY         = 40,
-    OLED_TASK_PRIORITY         = 50,
+    IDLE_TASK_PRIORITY = 0,
+
+    MQTT_TASK_PRIORITY = 40,
+    OLED_TASK_PRIORITY = 50,
     NRF_RECEIVER_TASK_PRIORITY = 60
 } TaskPriority;
 
-static const uint8_t addr[]  = {0xE7, 0xE7, 0xE7, 0xE7, 0xE7};
+// Địa chỉ 5 byte và kênh truyền cho NRF24L01
+static const uint8_t addr[] = {0xE7, 0xE7, 0xE7, 0xE7, 0xE7};
 static const uint8_t channel = 40;
+
+typedef struct
+{
+    uint8_t red_value;
+    uint8_t green_value;
+    uint8_t blue_value;
+} RGB_Led;
+
+static RGB_Led  rgb_led;
+static RGB_Led  last_rgb_led;
+
+static int RGBLed_Equals(const RGB_Led *left, const RGB_Led *right)
+{
+    return (left->red_value == right->red_value) &&
+           (left->green_value == right->green_value) &&
+           (left->blue_value == right->blue_value);
+}
 
 static pthread_mutex_t rgb_data_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void* MQTT_Task(void *parameter);
 void* Task_Oled(void *parameter);
 void* Task_NRF_Receiver(void *parameter);
+void* Task_Button(void *parameter);
+void* Task_RGB_auto_switch_collor(void *parameter);
 
 int main(void)
 {
     pthread_attr_t attr;
-    pthread_t t_oled, t_nrf, t_mqtt;
+    struct sched_param param;
+
+    pthread_t t_oled, t_nrf, t_mqtt, t_button, t_rgb_auto;
     int rc;
 
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
-    /*
-     * TODO: bật lại SCHED_FIFO khi deploy production
-     * Yêu cầu CAP_SYS_NICE hoặc chạy qua: chrt -f 1 /usr/bin/app
-     *
-     * struct sched_param param;
-     * pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
-     * pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
-     * param.sched_priority = OLED_TASK_PRIORITY;
-     * pthread_attr_setschedparam(&attr, &param);
-     */
+    /* TODO: bật lại SCHED_FIFO khi chạy với CAP_SYS_NICE hoặc setuid root
+    pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
+    pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
+    param.sched_priority = OLED_TASK_PRIORITY;
+    pthread_attr_setschedparam(&attr, &param);
+    */
 
     rc = pthread_create(&t_oled, &attr, Task_Oled, NULL);
     if (rc != 0) { printf("pthread_create Task_Oled failed: %d\n", rc); return 1; }
@@ -181,69 +203,165 @@ int main(void)
     rc = pthread_create(&t_mqtt, &attr, MQTT_Task, NULL);
     if (rc != 0) { printf("pthread_create MQTT_Task failed: %d\n", rc); return 1; }
 
+    rc = pthread_create(&t_button, &attr, Task_Button, NULL);
+    if (rc != 0) { printf("pthread_create Task_Button failed: %d\n", rc); return 1; }
+
+    rc = pthread_create(&t_rgb_auto, &attr, Task_RGB_auto_switch_collor, NULL);
+    if (rc != 0) { printf("pthread_create Task_RGB_auto failed: %d\n", rc); return 1; }
+
     pthread_attr_destroy(&attr);
 
-    while (1) { msleep(1000); }
+    while (1)
+    {
+        msleep(1000);
+    }
 
     return 0;
 }
 
+void* Task_Button(void *parameter)
+{
+    (void)parameter;
+    int fd = open(DEVICE, O_RDONLY);
+    if (fd < 0)
+    {
+        perror("Failed to open button device");
+        return NULL;
+    }
+
+    while (1)
+    {
+        char buf[16];
+        ssize_t bytes_read = read(fd, buf, sizeof(buf));
+        if (bytes_read < 0)
+        {
+            perror("Failed to read button state");
+            break;
+        }
+        if (bytes_read >= sizeof(buf))
+            bytes_read = sizeof(buf) - 1;
+        
+        buf[bytes_read] = '\0';
+        if(buf[0] == '1')
+        {
+            printf("Button pressed\n");
+            button_flag = !button_flag;
+        }
+        msleep(100);
+    }
+
+    close(fd);
+    return NULL;
+}
+
 void* Task_Oled(void *parameter)
 {
-    uint8_t local_value = 0;
+    RGB_Led local_rgb_led;
+
 
     Oled_Init();
-    while (1)
+    while (1)                   
     {
         msleep(20);
 
         pthread_mutex_lock(&rgb_data_mutex);
+        local_rgb_led = rgb_led;
         pthread_mutex_unlock(&rgb_data_mutex);
 
         Oled_Fill(Black);
 
         char str[32] = "RGB Value";
+
         Oled_StringSize_t str_size = Oled_GetStringSize(str, &DEFAULT_FONT);
 
         Oled_FillRectangle(0, 0, OLED_WIDTH, str_size.height + 4, White);
+
         Oled_SetCursor((OLED_WIDTH - str_size.width) / 2, str_size.height + 2);
         Oled_WriteString(str, &DEFAULT_FONT, Black);
 
         const uint8_t text_delta_y = 13;
         uint8_t text_x = 5;
         uint8_t text_y = str_size.height + 20;
-
         Oled_SetCursor(text_x, text_y);
-        snprintf(str, sizeof(str), "Red Value:     %d", local_value++);
+        snprintf(str, sizeof(str), "Red Value:     %d", local_rgb_led.red_value);
         Oled_WriteString(str, &DEFAULT_FONT, White);
 
         text_y += text_delta_y;
         Oled_SetCursor(text_x, text_y);
-        snprintf(str, sizeof(str), "Green Value: %d", local_value++);
+        snprintf(str, sizeof(str), "Green Value: %d", local_rgb_led.green_value);
         Oled_WriteString(str, &DEFAULT_FONT, White);
 
         text_y += text_delta_y;
         Oled_SetCursor(text_x, text_y);
-        snprintf(str, sizeof(str), "Blue Value:    %d", local_value++);
+        snprintf(str, sizeof(str), "Blue Value:    %d", local_rgb_led.blue_value);
         Oled_WriteString(str, &DEFAULT_FONT, White);
 
-        if (local_value > 255) local_value = 0;
         Oled_UpdateScreen();
     }
     return NULL;
 }
 
-void* Task_NRF_Receiver(void *parameter)
+void* Task_RGB_auto_switch_collor(void *parameter)
 {
-    // TODO: bật lại khi có package nrf24l01 và rgb_led
-    // RGBLed_Init();
-    // NRF_RX_Mode_Init(addr, channel);
-    // NRF_StartListening();
-    uint8_t dummy_data = 0;
+    (void)parameter;
+    RGB_Led local_rgb_led = {0};
+
     while (1)
     {
-        printf("NRF Receiver Task running... %d\n", dummy_data++);
-        msleep(5000);
+        if(button_flag){
+            msleep(100);
+            local_rgb_led.blue_value = 0;
+            local_rgb_led.green_value = 0;
+            local_rgb_led.red_value = 0;
+            continue;
+        }
+        
+        local_rgb_led.red_value   = (local_rgb_led.red_value + 1) % 256;
+        local_rgb_led.green_value = (local_rgb_led.green_value + 1) % 256;
+        local_rgb_led.blue_value  = (local_rgb_led.blue_value + 1) % 256;
+
+        pthread_mutex_lock(&rgb_data_mutex);
+        rgb_led = local_rgb_led;
+        pthread_mutex_unlock(&rgb_data_mutex);
+
+
+        msleep(100);
+
+    }
+    return NULL;
+}
+void* Task_NRF_Receiver(void *parameter)
+{
+    // RGBLed_Init();
+    NRF_RX_Mode_Init(addr, channel);
+    NRF_StartListening();
+    while (1)
+    {
+        if(!button_flag){
+            msleep(100);
+            continue;
+        }
+        if(NRF_DataReady())
+        {
+            
+            RGB_Led local_rgb_led;
+
+            uint8_t data[PACKET_SIZE];
+            memset(data, 0, PACKET_SIZE);
+            NRF_ReadData(data, PACKET_SIZE);
+
+            printf("RGB to ESP32: %u %u %u\n", data[0], data[1], data[2]);
+            local_rgb_led.red_value = data[0];
+            local_rgb_led.green_value = data[1];
+            local_rgb_led.blue_value = data[2];
+
+            // NRF_ReadData((uint8_t *)(&local_rgb_led), sizeof(local_rgb_led));
+            // RGBLed_Show(local_rgb_led);
+            pthread_mutex_lock(&rgb_data_mutex);
+            rgb_led = local_rgb_led;
+            pthread_mutex_unlock(&rgb_data_mutex);
+        }
+        msleep(100);
     }
     return NULL;
 }
@@ -252,7 +370,7 @@ void On_MQTT_HandleMessage(const char* topic, const char* payload);
 
 void* MQTT_Task(void *parameter)
 {
-    const uint32_t reconnect_delay_ms    = 2000;
+    const uint32_t reconnect_delay_ms = 2000;
     const uint32_t publish_retry_delay_ms = 500;
     (void)parameter;
 
@@ -262,21 +380,25 @@ void* MQTT_Task(void *parameter)
         msleep(reconnect_delay_ms);
     }
 
-    while (MQTT_SubscribeTopic(MQTT_TOPIC) != MQTTCLIENT_SUCCESS)
+    while (MQTT_SubscribeTopic(MQTT_TOPIC_SUB) != MQTTCLIENT_SUCCESS)
     {
         printf("MQTT subscribe failed, retrying...\n");
+
         while (MQTT_Reconnect() != MQTTCLIENT_SUCCESS)
         {
             printf("MQTT reconnect failed, retrying...\n");
             msleep(reconnect_delay_ms);
         }
+
         msleep(reconnect_delay_ms);
     }
 
-    uint8_t led_value = 0;
-    while (1)
+    while (1) 
     {
+        RGB_Led local_rgb_led;
+
         pthread_mutex_lock(&rgb_data_mutex);
+        local_rgb_led = rgb_led;
         pthread_mutex_unlock(&rgb_data_mutex);
 
         if (!MQTT_IsConnected())
@@ -286,28 +408,28 @@ void* MQTT_Task(void *parameter)
                 printf("MQTT reconnect failed, retrying...\n");
                 msleep(reconnect_delay_ms);
             }
-            while (MQTT_SubscribeTopic(MQTT_TOPIC) != MQTTCLIENT_SUCCESS)
+
+            while (MQTT_SubscribeTopic(MQTT_TOPIC_SUB) != MQTTCLIENT_SUCCESS)
             {
                 printf("MQTT subscribe failed after reconnect, retrying...\n");
                 msleep(reconnect_delay_ms);
             }
         }
 
+        if(!RGBLed_Equals(&last_rgb_led, &local_rgb_led))
         {
             char payload[128];
-            int  publish_rc;
+            int publish_rc;
 
-            // Tách increment ra khỏi snprintf để tránh undefined behavior
-            snprintf(payload, sizeof(payload),
-                     "{\"Red\": %d, \"Green\": %d, \"Blue\": %d}",
-                     led_value, led_value + 1, led_value + 2);
-            led_value += 3;
+            snprintf(payload, sizeof(payload), "{\"Red\": %d, \"Green\": %d, \"Blue\": %d}", local_rgb_led.red_value, local_rgb_led.green_value, local_rgb_led.blue_value);
 
-            do {
-                publish_rc = MQTT_PublishMessage(MQTT_TOPIC, payload);
+            do
+            {
+                publish_rc = MQTT_PublishMessage(MQTT_TOPIC_PUB, payload);
                 if (publish_rc != MQTTCLIENT_SUCCESS)
                 {
                     printf("MQTT publish failed, retrying...\n");
+
                     if (!MQTT_IsConnected())
                     {
                         while (MQTT_Reconnect() != MQTTCLIENT_SUCCESS)
@@ -315,26 +437,34 @@ void* MQTT_Task(void *parameter)
                             printf("MQTT reconnect failed, retrying...\n");
                             msleep(reconnect_delay_ms);
                         }
-                        while (MQTT_SubscribeTopic(MQTT_TOPIC) != MQTTCLIENT_SUCCESS)
+
+                        while (MQTT_SubscribeTopic(MQTT_TOPIC_SUB) != MQTTCLIENT_SUCCESS)
                         {
                             printf("MQTT subscribe failed after reconnect, retrying...\n");
                             msleep(reconnect_delay_ms);
                         }
                     }
+
                     msleep(publish_retry_delay_ms);
                 }
             } while (publish_rc != MQTTCLIENT_SUCCESS);
 
-            if (led_value > 252) led_value = 0;
+            last_rgb_led = local_rgb_led;
         }
 
-        msleep(1000);
+        msleep(500);
     }
     return NULL;
 }
 
+
+// Hàm callback xử lý tin nhắn MQTT nhận được
 void On_MQTT_HandleMessage(const char* topic, const char* payload)
 {
+    if(button_flag){
+        printf("Button is pressed, ignoring MQTT message\n");
+        return;
+    }
     cJSON *root = cJSON_Parse(payload);
     if (root == NULL)
     {
@@ -359,15 +489,15 @@ void On_MQTT_HandleMessage(const char* topic, const char* payload)
     pthread_mutex_lock(&rgb_data_mutex);
     printf("Received MQTT message on topic '%s': Red=%d, Green=%d, Blue=%d\n",
            topic, red, green, blue);
-    // TODO: bật lại khi có rgb_led
-    // rgb_led.red_value   = red;
-    // rgb_led.green_value = green;
-    // rgb_led.blue_value  = blue;
-    // last_rgb_led = rgb_led;
+    rgb_led.red_value   = red;
+    rgb_led.green_value = green;
+    rgb_led.blue_value  = blue;
+    //last_rgb_led = rgb_led;
     pthread_mutex_unlock(&rgb_data_mutex);
 
     cJSON_Delete(root);
 }
+
 ```
 
 ---
