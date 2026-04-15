@@ -47,7 +47,7 @@ Debounce 50ms được xử lý trong ISR bằng `jiffies`.
 
 ### `package/button/src/btn.c`
 
-```c
+```
 // SPDX-License-Identifier: GPL-2.0
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -62,7 +62,7 @@ Debounce 50ms được xử lý trong ISR bằng `jiffies`.
 #define DEVICE_NAME "btn"
 #define CLASS_NAME  "btn"
 #define BUTTON_GPIO 525
-#define DEBOUNCE_MS 50
+#define DEBOUNCE_MS 100
 
 static int major;
 static struct class *btn_class;
@@ -131,6 +131,7 @@ static struct file_operations fops = {
 static int __init btn_init(void)
 {
     printk(KERN_INFO "BTN init\n");
+    last_jiffies = jiffies - msecs_to_jiffies(50);
 
     if (gpio_request(BUTTON_GPIO, "btn_gpio")) {
         printk(KERN_ERR "gpio_request failed\n");
