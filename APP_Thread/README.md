@@ -33,6 +33,28 @@ buildroot/
     │       ├── mqtt.h
     │       └── mqtt.c
     │
+    ├── nrf24/
+    │   ├── Config.in
+    │   ├── nrf24.mk
+    │   └── src/
+    │       ├── nrf_spi/
+    │       │   ├── nrf_spi.c
+    │       │   └── nrf_spi.h
+    │       └── nrf24l01/
+    │           ├── nrf24l01.c
+    │           └── nrf24l01.h
+    │
+    ├── rgb/                        
+    │   ├── src/
+    │   │   ├── pwm/
+    │   │   │   ├── pwm.h
+    │   │   │   └── pwm.c
+    │   │   └── rgb_led/
+    │   │       ├── rgb_led.h
+    │   │       └── rgb_led.c
+    │   ├── Config.in
+    │   └── rgb.mk
+    │
     └── app/                       # Ứng dụng chính
         ├── Config.in
         ├── app.mk
@@ -48,11 +70,12 @@ buildroot/
 | Package | Vai trò | Nguồn |
 |---|---|---|
 | `oled` | Thư viện điều khiển OLED SSD1306 qua I2C | local |
+| `nrf24`| Thư viện điều khiển NRF24L01 qua SPI | local |
+| `rgb`  | Thư viện điều khiển led RGB | local |
 | `mqtt` | Wrapper mỏng cho paho-mqtt-c | local |
 | `cjson` | Parse JSON payload MQTT | Buildroot built-in |
 | `paho-mqtt-c` | MQTT client C library | Buildroot built-in |
 | `pthread` | POSIX Threads | glibc (có sẵn trong toolchain) |
-
 ---
 
 ## 3. Buildroot config
@@ -65,11 +88,13 @@ config BR2_PACKAGE_APP
 	depends on BR2_PACKAGE_OLED
 	depends on BR2_PACKAGE_MQTT
 	depends on BR2_PACKAGE_NRF24
+	select BR2_PACKAGE_RGB
 	select BR2_PACKAGE_CJSON   
 	help
 	  RGB LED controller application for BeagleBone.
 	  Receives RGB data via NRF24L01, displays on OLED,
 	  and publishes/subscribes via MQTT.
+
 ```
 
 ### `package/app/app.mk`
@@ -88,7 +113,7 @@ define APP_BUILD_CMDS
 		$(@D)/main.c \
 		-o $(@D)/app \
 		-L$(STAGING_DIR)/usr/lib \
-		-loled -lmqtt -lcjson -lpthread -lnrf24
+		-loled -lmqtt -lcjson -lpthread -lnrf24 -lrgb
 endef
 
 define APP_INSTALL_TARGET_CMDS
@@ -96,6 +121,7 @@ define APP_INSTALL_TARGET_CMDS
 endef
 
 $(eval $(generic-package))
+
 
 ```
 
@@ -119,7 +145,7 @@ $(eval $(generic-package))
 #include <cjson/cJSON.h>
 #include "oled.h"
 #include "nrf24l01.h"
-// #include "rgb_led.h"
+#include "rgb_led.h"
 #include "mqtt.h"
 
 #define DEVICE "/dev/btn"
@@ -151,13 +177,6 @@ enum {
 static const uint8_t addr[] = {0xE7, 0xE7, 0xE7, 0xE7, 0xE7};
 static const uint8_t channel = 40;
 
-typedef struct
-{
-    uint8_t red_value;
-    uint8_t green_value;
-    uint8_t blue_value;
-} RGB_Led;
-
 static RGB_Led  rgb_led;
 static RGB_Led  last_rgb_led;
 
@@ -183,6 +202,8 @@ int main(void)
 
     pthread_t t_oled, t_nrf, t_mqtt, t_button, t_rgb_auto;
     int rc;
+
+    RGBLed_Init();
 
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
@@ -304,35 +325,31 @@ void* Task_Oled(void *parameter)
 void* Task_RGB_auto_switch_collor(void *parameter)
 {
     (void)parameter;
-    RGB_Led local_rgb_led = {0};
+    float hue = 0.0f;
 
-    while (1)
-    {
-        if(button_flag){
+    while (1) {
+        if (button_flag) {
             msleep(100);
-            local_rgb_led.blue_value = 0;
-            local_rgb_led.green_value = 0;
-            local_rgb_led.red_value = 0;
             continue;
         }
-        
-        local_rgb_led.red_value   = (local_rgb_led.red_value + 1) % 256;
-        local_rgb_led.green_value = (local_rgb_led.green_value + 1) % 256;
-        local_rgb_led.blue_value  = (local_rgb_led.blue_value + 1) % 256;
+
+        RGB_Led local_rgb_led = HSVtoRGB(hue, PWM_MAX_DUTY, PWM_MAX_DUTY);
+        RGBLed_Show(local_rgb_led);        
 
         pthread_mutex_lock(&rgb_data_mutex);
         rgb_led = local_rgb_led;
         pthread_mutex_unlock(&rgb_data_mutex);
 
+        hue += 1.0f;
+        if (hue >= 360.0f) hue = 0.0f;
 
         msleep(100);
-
     }
     return NULL;
 }
+
 void* Task_NRF_Receiver(void *parameter)
 {
-    // RGBLed_Init();
     NRF_RX_Mode_Init(addr, channel);
     NRF_StartListening();
     while (1)
@@ -346,17 +363,17 @@ void* Task_NRF_Receiver(void *parameter)
             
             RGB_Led local_rgb_led;
 
-            uint8_t data[PACKET_SIZE];
-            memset(data, 0, PACKET_SIZE);
-            NRF_ReadData(data, PACKET_SIZE);
+            uint16_t data[3];
+            memset(data, 0, sizeof(data));      
+            NRF_ReadData((uint8_t *)data, sizeof(data)); 
 
             printf("RGB to ESP32: %u %u %u\n", data[0], data[1], data[2]);
             local_rgb_led.red_value = data[0];
             local_rgb_led.green_value = data[1];
             local_rgb_led.blue_value = data[2];
 
-            // NRF_ReadData((uint8_t *)(&local_rgb_led), sizeof(local_rgb_led));
-            // RGBLed_Show(local_rgb_led);
+            RGBLed_Show(local_rgb_led);
+
             pthread_mutex_lock(&rgb_data_mutex);
             rgb_led = local_rgb_led;
             pthread_mutex_unlock(&rgb_data_mutex);
@@ -461,7 +478,7 @@ void* MQTT_Task(void *parameter)
 // Hàm callback xử lý tin nhắn MQTT nhận được
 void On_MQTT_HandleMessage(const char* topic, const char* payload)
 {
-    if(button_flag){
+    if(!button_flag){
         printf("Button is pressed, ignoring MQTT message\n");
         return;
     }
@@ -486,123 +503,20 @@ void On_MQTT_HandleMessage(const char* topic, const char* payload)
     int green = cJSON_GetNumberValue(green_value);
     int blue  = cJSON_GetNumberValue(blue_value);
 
-    pthread_mutex_lock(&rgb_data_mutex);
+    RGB_Led local_rgb_led = { .red_value = red, .green_value = green, .blue_value = blue };
     printf("Received MQTT message on topic '%s': Red=%d, Green=%d, Blue=%d\n",
            topic, red, green, blue);
-    rgb_led.red_value   = red;
-    rgb_led.green_value = green;
-    rgb_led.blue_value  = blue;
-    //last_rgb_led = rgb_led;
+    RGBLed_Show(local_rgb_led);
+
+    pthread_mutex_lock(&rgb_data_mutex);
+
+    rgb_led = local_rgb_led;
     pthread_mutex_unlock(&rgb_data_mutex);
 
     cJSON_Delete(root);
 }
 
+
 ```
 
 ---
-
-## 5. Các lỗi đã fix
-
-| # | Lỗi gốc | Sửa thành | Lý do |
-|---|---|---|---|
-| 1 | `while (1) v` | `while (1)` | Ký tự `v` thừa, syntax error |
-| 2 | `unit8_t led_value` | `uint8_t led_value` | Typo, type không tồn tại |
-| 3 | Dòng `va` thừa | Xóa | Token lạ, syntax error |
-| 4 | `snprintf(..., led_value++, led_value++, led_value++)` | Tách thành `led_value, led_value+1, led_value+2` rồi `led_value += 3` | Undefined behavior — thứ tự evaluation của argument trong C không xác định |
-| 5 | `pthread_create(NULL, ...)` | `pthread_create(&t_oled, ...)` | NULL thread handle gây undefined behavior |
-| 6 | `SCHED_FIFO` không có `CAP_SYS_NICE` | Comment lại, dùng `SCHED_OTHER` | `pthread_create` trả về `EPERM` → thread không tạo được → segfault |
-
----
-
-## 6. Vấn đề SCHED_FIFO và Segmentation Fault
-
-### Nguyên nhân segfault
-
-```
-pthread_create(..., SCHED_FIFO, priority=50)
-    → trả về EPERM (thiếu CAP_SYS_NICE)
-    → thread KHÔNG được tạo
-    → main() tiếp tục chạy
-    → các hàm trong thread cố gọi hardware chưa init
-    → SEGMENTATION FAULT
-```
-
-### Kích hoạt lại SCHED_FIFO khi deploy
-
-**Cách 1 — chạy với `chrt`** (khuyến nghị cho embedded):
-```bash
-chrt -f 1 /usr/bin/app
-```
-
-**Cách 2 — cấp capability cho binary**:
-```bash
-setcap cap_sys_nice+ep /usr/bin/app
-```
-
-**Cách 3 — init script tự động khi boot**, tạo file `package/app/S99app`:
-```sh
-#!/bin/sh
-case "$1" in
-    start) chrt -f 1 /usr/bin/app & ;;
-    stop)  killall app ;;
-esac
-```
-
-Thêm vào `app.mk`:
-```makefile
-define APP_INSTALL_TARGET_CMDS
-    $(INSTALL) -D -m 0755 $(@D)/app     $(TARGET_DIR)/usr/bin/app
-    $(INSTALL) -D -m 0755 $(TOPDIR)/package/app/S99app \
-                                         $(TARGET_DIR)/etc/init.d/S99app
-endef
-```
-
-Sau khi bật lại SCHED_FIFO, bỏ comment phần TODO trong `main()` và set priority đúng cho từng thread:
-
-```c
-pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
-pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
-
-// NRF: priority cao nhất — nhận data không được trễ
-param.sched_priority = NRF_RECEIVER_TASK_PRIORITY; // 60
-pthread_attr_setschedparam(&attr, &param);
-pthread_create(&t_nrf, &attr, Task_NRF_Receiver, NULL);
-
-// OLED: priority trung bình — hiển thị mượt
-param.sched_priority = OLED_TASK_PRIORITY;         // 50
-pthread_attr_setschedparam(&attr, &param);
-pthread_create(&t_oled, &attr, Task_Oled, NULL);
-
-// MQTT: priority thấp nhất — publish 1s/lần, chậm cũng được
-param.sched_priority = MQTT_TASK_PRIORITY;         // 40
-pthread_attr_setschedparam(&attr, &param);
-pthread_create(&t_mqtt, &attr, MQTT_Task, NULL);
-```
-
----
-
-## 7. Build và deploy
-
-```bash
-# Build
-make app
-
-# Copy lên board
-scp ~/Documents/buildroot/output/target/usr/bin/app root@192.168.7.2:/usr/bin/app
-
-# Chạy thường
-/usr/bin/app
-
-# Chạy với realtime scheduling
-chrt -f 1 /usr/bin/app
-```
-
----
-
-## 8. TODO
-
-- [ ] Tạo package `nrf24l01` và bỏ comment trong `Task_NRF_Receiver`
-- [ ] Tạo package `rgb_led` và bỏ comment trong `On_MQTT_HandleMessage`
-- [ ] Bật lại `SCHED_FIFO` khi deploy production (xem mục 6)
-- [ ] Kết nối `rgb_led` global variable giữa các task qua mutex

@@ -30,15 +30,27 @@ P9_1  (GND)      ────────── GND (chân chung)
 ```
 buildroot/
 └── package/
-    ├── pwm_rgb/
+    ├── pwm_rgb/                    ← Kernel module driver
     │   ├── src/
-    │   │   ├── pwm_rgb.c       ← Kernel module driver
-    │   │   └── Makefile        ← Build kernel module
+    │   │   ├── pwm_rgb.c
+    │   │   └── Makefile
     │   ├── Config.in
     │   └── pwm_rgb.mk
-    └── pwm_test/
+    │
+    ├── rgb/                        ← Userspace library
+    │   ├── src/
+    │   │   ├── pwm/
+    │   │   │   ├── pwm.h
+    │   │   │   └── pwm.c
+    │   │   └── rgb_led/
+    │   │       ├── rgb_led.h
+    │   │       └── rgb_led.c
+    │   ├── Config.in
+    │   └── rgb.mk
+    │
+    └── pwm_test/                   ← Userspace test app
         ├── src/
-        │   └── pwm_test.c      ← Userspace test app
+        │   └── pwm_test.c
         ├── Config.in
         └── pwm_test.mk
 ```
@@ -54,8 +66,8 @@ Thêm vào trong block `&am33xx_pinmux`:
 ```dts
 ehrpwm1_pins: ehrpwm1-pins {
     pinctrl-single,pins = <
-        AM33XX_PADCONF(AM335X_PIN_GPMC_A2, PIN_OUTPUT, MUX_MODE6)  /* P9_14 ehrpwm1A */
-        AM33XX_PADCONF(AM335X_PIN_GPMC_A3, PIN_OUTPUT, MUX_MODE6)  /* P9_16 ehrpwm1B */
+        AM33XX_PADCONF(AM335X_PIN_GPMC_A2, PIN_OUTPUT, MUX_MODE6)   /* P9_14 ehrpwm1A */
+        AM33XX_PADCONF(AM335X_PIN_GPMC_A3, PIN_OUTPUT, MUX_MODE6)   /* P9_16 ehrpwm1B */
     >;
 };
 
@@ -118,12 +130,12 @@ Bật các option sau:
 ```
 Device Drivers
   └── Pulse-Width Modulation (PWM) Support
-        └── [*] EHRPWM PWM support          (CONFIG_PWM_TIEHRPWM)
-        └── [*] ECAP PWM support            (CONFIG_PWM_ECAP)
+        └── [*] EHRPWM PWM support     (CONFIG_PWM_TIEHRPWM)
+        └── [*] ECAP PWM support       (CONFIG_PWM_ECAP)
 
 Device Drivers
   └── LED Support
-        └── [*] LED Class Support           (CONFIG_LEDS_CLASS)
+        └── [*] LED Class Support      (CONFIG_LEDS_CLASS)
 ```
 
 ---
@@ -272,6 +284,7 @@ MODULE_DESCRIPTION("PWM RGB LED Driver for BeagleBone Black");
 MODULE_LICENSE("GPL v2");
 ```
 
+
 ### `package/pwm_rgb/src/Makefile`
 
 ```makefile
@@ -319,22 +332,310 @@ $(eval $(generic-package))
 
 ---
 
-## Bước 4 — Userspace App (`pwm_test`)
+## Bước 4 — Thư viện RGB (`rgb`)
 
-### `package/pwm_test/pwm_test.c`
+Thư viện userspace cung cấp abstraction cho PWM và chuyển đổi màu HSV → RGB. Scale duty cycle `0..1000` thay vì `0..255` để độ phân giải cao hơn.
+
+### Cấu trúc
+
+```
+pwm/
+  pwm.h / pwm.c     — Mở sysfs fd, ghi brightness, scale 0..1000 → 0..255
+rgb_led/
+  rgb_led.h         — Struct RGB_Led, macro màu định sẵn, khai báo hàm
+  rgb_led.c         — RGBLed_Init/Show/Off, HSVtoRGB
+```
+
+### `package/rgb/src/rgb_led/rgb_led.h`
+
+```c
+#ifndef __RGB_LED__
+#define __RGB_LED__
+
+#include "pwm.h"
+
+#define RED_PWM_CHANNEL   1
+#define GREEN_PWM_CHANNEL 2
+#define BLUE_PWM_CHANNEL  3
+
+typedef struct {
+    uint16_t red_value;
+    uint16_t green_value;
+    uint16_t blue_value;
+} RGB_Led;
+
+void    RGBLed_Init(void);
+void    RGBLed_Show(RGB_Led rgb_led);
+void    RGBLed_Off(void);
+
+RGB_Led HSVtoRGB(float h, int s, int v);
+
+/* Một số màu định sẵn (scale 0..PWM_MAX_DUTY) */
+#define RGB_RED     (RGB_Led){ PWM_MAX_DUTY, 0,              0            }
+#define RGB_GREEN   (RGB_Led){ 0,            PWM_MAX_DUTY,   0            }
+#define RGB_BLUE    (RGB_Led){ 0,            0,              PWM_MAX_DUTY }
+#define RGB_YELLOW  (RGB_Led){ PWM_MAX_DUTY, PWM_MAX_DUTY,   0            }
+#define RGB_CYAN    (RGB_Led){ 0,            PWM_MAX_DUTY,   PWM_MAX_DUTY }
+#define RGB_MAGENTA (RGB_Led){ PWM_MAX_DUTY, 0,              PWM_MAX_DUTY }
+#define RGB_WHITE   (RGB_Led){ PWM_MAX_DUTY, PWM_MAX_DUTY,   PWM_MAX_DUTY }
+#define RGB_OFF     (RGB_Led){ 0,            0,              0            }
+
+#endif /* __RGB_LED__ */
+
+```
+
+### `package/rgb/src/rgb_led/rgb_led.c`
+
+```c
+#include "rgb_led.h"
+
+/* ------------------------------------------------------------------ */
+/* Khởi tạo 3 kênh PWM                                                */
+/* ------------------------------------------------------------------ */
+void RGBLed_Init(void)
+{
+    PWM_Config(RED_PWM_CHANNEL);
+    PWM_Config(GREEN_PWM_CHANNEL);
+    PWM_Config(BLUE_PWM_CHANNEL);
+}
+
+/* ------------------------------------------------------------------ */
+/* Hiển thị màu                                                        */
+/* ------------------------------------------------------------------ */
+void RGBLed_Show(RGB_Led rgb_led)
+{
+    PWM_SetDuty(RED_PWM_CHANNEL,   rgb_led.red_value);
+    PWM_SetDuty(GREEN_PWM_CHANNEL, rgb_led.green_value);
+    PWM_SetDuty(BLUE_PWM_CHANNEL,  rgb_led.blue_value);
+}
+
+/* ------------------------------------------------------------------ */
+/* Tắt LED                                                             */
+/* ------------------------------------------------------------------ */
+void RGBLed_Off(void)
+{
+    RGBLed_Show(RGB_OFF);
+}
+
+/* ------------------------------------------------------------------ */
+/* Chuyển đổi HSV → RGB                                               */
+/* h: 0.0 ~ 360.0                                                      */
+/* s: 0 ~ PWM_MAX_DUTY (1000)                                         */
+/* v: 0 ~ PWM_MAX_DUTY (1000)                                         */
+/* ------------------------------------------------------------------ */
+RGB_Led HSVtoRGB(float h, int s, int v)
+{
+    RGB_Led rgb;
+    float   hh, p, q, t, ff;
+    int     i;
+    float   S = s / (float)PWM_MAX_DUTY;
+    float   V = v / (float)PWM_MAX_DUTY;
+
+    if (s <= 0) {
+        rgb.red_value = rgb.green_value = rgb.blue_value = (uint16_t)v;
+        return rgb;
+    }
+
+    if (h >= 360.0f) h = 0.0f;
+
+    hh = h / 60.0f;
+    i  = (int)hh;
+    ff = hh - i;
+
+    p = V * (1.0f - S);
+    q = V * (1.0f - (S * ff));
+    t = V * (1.0f - (S * (1.0f - ff)));
+
+    switch (i) {
+        case 0:
+            rgb.red_value   = (uint16_t)(V * PWM_MAX_DUTY);
+            rgb.green_value = (uint16_t)(t * PWM_MAX_DUTY);
+            rgb.blue_value  = (uint16_t)(p * PWM_MAX_DUTY);
+            break;
+        case 1:
+            rgb.red_value   = (uint16_t)(q * PWM_MAX_DUTY);
+            rgb.green_value = (uint16_t)(V * PWM_MAX_DUTY);
+            rgb.blue_value  = (uint16_t)(p * PWM_MAX_DUTY);
+            break;
+        case 2:
+            rgb.red_value   = (uint16_t)(p * PWM_MAX_DUTY);
+            rgb.green_value = (uint16_t)(V * PWM_MAX_DUTY);
+            rgb.blue_value  = (uint16_t)(t * PWM_MAX_DUTY);
+            break;
+        case 3:
+            rgb.red_value   = (uint16_t)(p * PWM_MAX_DUTY);
+            rgb.green_value = (uint16_t)(q * PWM_MAX_DUTY);
+            rgb.blue_value  = (uint16_t)(V * PWM_MAX_DUTY);
+            break;
+        case 4:
+            rgb.red_value   = (uint16_t)(t * PWM_MAX_DUTY);
+            rgb.green_value = (uint16_t)(p * PWM_MAX_DUTY);
+            rgb.blue_value  = (uint16_t)(V * PWM_MAX_DUTY);
+            break;
+        default:
+            rgb.red_value   = (uint16_t)(V * PWM_MAX_DUTY);
+            rgb.green_value = (uint16_t)(p * PWM_MAX_DUTY);
+            rgb.blue_value  = (uint16_t)(q * PWM_MAX_DUTY);
+            break;
+    }
+
+    return rgb;
+}
+
+```
+
+### `package/rgb/src/pwm/pwm.h`
+
+```c
+#ifndef __PWM__
+#define __PWM__
+
+#include <stdlib.h>
+#include <stdint.h>
+
+#define PWM_MAX_DUTY 1000
+
+/* Sysfs paths cho từng channel */
+#define PWM_CH1_PATH  "/sys/class/leds/rgb:red/brightness"
+#define PWM_CH2_PATH  "/sys/class/leds/rgb:green/brightness"
+#define PWM_CH3_PATH  "/sys/class/leds/rgb:blue/brightness"
+
+void     PWM_Config(int channel);
+void     PWM_SetDuty(int channel, uint16_t duty);
+
+#endif /* __PWM__ */
+
+```
+
+
+### `package/rgb/src/pwm/pwm.c`
+
+```c
+#include "pwm.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+/* File descriptors cho 3 channel, mở 1 lần */
+static int pwm_fd[4] = { -1, -1, -1, -1 }; /* index 1..3 */
+
+static const char *pwm_path(int channel)
+{
+    switch (channel) {
+        case 1: return PWM_CH1_PATH;
+        case 2: return PWM_CH2_PATH;
+        case 3: return PWM_CH3_PATH;
+        default: return NULL;
+    }
+}
+
+/* Mở file sysfs, sẵn sàng ghi */
+void PWM_Config(int channel)
+{
+    const char *path = pwm_path(channel);
+    if (!path) {
+        fprintf(stderr, "PWM_Config: invalid channel %d\n", channel);
+        return;
+    }
+
+    if (pwm_fd[channel] >= 0)
+        return; /* đã mở rồi */
+
+    pwm_fd[channel] = open(path, O_WRONLY);
+    if (pwm_fd[channel] < 0)
+        perror(path);
+}
+
+/* Ghi duty cycle vào sysfs
+ * duty: 0 ~ PWM_MAX_DUTY (1000) → map sang 0 ~ 255 */
+void PWM_SetDuty(int channel, uint16_t duty)
+{
+    char buf[8];
+    int  len;
+    int  brightness;
+
+    if (channel < 1 || channel > 3 || pwm_fd[channel] < 0)
+        return;
+
+    if (duty > PWM_MAX_DUTY)
+        duty = PWM_MAX_DUTY;
+
+    /* Scale: 0..1000 → 0..255 */
+    brightness = (int)((uint32_t)duty * 255 / PWM_MAX_DUTY);
+
+    len = snprintf(buf, sizeof(buf), "%d", brightness);
+    lseek(pwm_fd[channel], 0, SEEK_SET);
+    (void)write(pwm_fd[channel], buf, len);
+}
+
+```
+
+
+### `package/rgb/Config.in`
+
+```
+config BR2_PACKAGE_RGB
+	bool "rgb"
+	help
+	  RGB LED library for BeagleBone Black.
+	  Installs librgb.a và librgb.so.
+```
+
+### `package/rgb/rgb.mk`
+
+```makefile
+RGB_VERSION     = 1.0
+RGB_SITE        = $(TOPDIR)/package/rgb/src
+RGB_SITE_METHOD = local
+RGB_INSTALL_STAGING = YES
+
+define RGB_BUILD_CMDS
+	$(TARGET_CC) $(TARGET_CFLAGS) -fPIC \
+		-I$(@D)/pwm -I$(@D)/rgb_led \
+		-c $(@D)/pwm/pwm.c -o $(@D)/pwm.o
+
+	$(TARGET_CC) $(TARGET_CFLAGS) -fPIC \
+		-I$(@D)/pwm -I$(@D)/rgb_led \
+		-c $(@D)/rgb_led/rgb_led.c -o $(@D)/rgb_led.o
+
+	$(TARGET_AR) rcs $(@D)/librgb.a $(@D)/pwm.o $(@D)/rgb_led.o
+	$(TARGET_CC) -shared -o $(@D)/librgb.so $(@D)/pwm.o $(@D)/rgb_led.o
+endef
+
+define RGB_INSTALL_STAGING_CMDS
+	$(INSTALL) -D -m 0644 $(@D)/librgb.a       $(STAGING_DIR)/usr/lib/librgb.a
+	$(INSTALL) -D -m 0755 $(@D)/librgb.so      $(STAGING_DIR)/usr/lib/librgb.so
+	$(INSTALL) -D -m 0644 $(@D)/pwm/pwm.h      $(STAGING_DIR)/usr/include/pwm.h
+	$(INSTALL) -D -m 0644 $(@D)/rgb_led/rgb_led.h $(STAGING_DIR)/usr/include/rgb_led.h
+endef
+
+define RGB_INSTALL_TARGET_CMDS
+	$(INSTALL) -D -m 0755 $(@D)/librgb.so $(TARGET_DIR)/usr/lib/librgb.so
+endef
+
+$(eval $(generic-package))
+```
+
+> **Lưu ý:** `rgb_led.h` phải dùng `#include "pwm.h"` (không phải `../pwm/pwm.h`) vì sau khi install vào staging cả 2 header cùng cấp trong `usr/include/`.
+
+---
+
+## Bước 5 — Userspace App (`pwm_test`)
+
+App dùng thư viện `librgb` để điều khiển LED.
+
+### `package/pwm_test/src/pwm_test.c`
 
 ```c
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <math.h>
 #include <signal.h>
 
-#define SYSFS_RED   "/sys/class/leds/rgb:red/brightness"
-#define SYSFS_GREEN "/sys/class/leds/rgb:green/brightness"
-#define SYSFS_BLUE  "/sys/class/leds/rgb:blue/brightness"
+#include <rgb_led.h>
 
 static volatile int running = 1;
 
@@ -345,120 +646,20 @@ static void handle_sigint(int sig)
 }
 
 /* ------------------------------------------------------------------ */
-/* Mở file descriptor 1 lần, tái dụng lại cho tốc độ cao              */
-/* ------------------------------------------------------------------ */
-static int fd_r = -1, fd_g = -1, fd_b = -1;
-
-static void open_leds(void)
-{
-    fd_r = open(SYSFS_RED,   O_WRONLY);
-    fd_g = open(SYSFS_GREEN, O_WRONLY);
-    fd_b = open(SYSFS_BLUE,  O_WRONLY);
-
-    if (fd_r < 0 || fd_g < 0 || fd_b < 0) {
-        perror("open sysfs led");
-        exit(1);
-    }
-}
-
-static void close_leds(void)
-{
-    if (fd_r >= 0) close(fd_r);
-    if (fd_g >= 0) close(fd_g);
-    if (fd_b >= 0) close(fd_b);
-}
-
-static inline void write_brightness(int fd, int val)
-{
-    char buf[8];
-    int len = snprintf(buf, sizeof(buf), "%d", val);
-    lseek(fd, 0, SEEK_SET);
-    (void)write(fd, buf, len);
-}
-
-static void set_rgb(int r, int g, int b)
-{
-    write_brightness(fd_r, r);
-    write_brightness(fd_g, g);
-    write_brightness(fd_b, b);
-}
-
-static void all_off(void)
-{
-    set_rgb(0, 0, 0);
-}
-
-/* ------------------------------------------------------------------ */
-/* HSV → RGB                                                           */
-/* h: 0.0 ~ 360.0  s: 0.0 ~ 1.0  v: 0.0 ~ 1.0                       */
-/* ------------------------------------------------------------------ */
-static void hsv_to_rgb(float h, float s, float v,
-                       int *r, int *g, int *b)
-{
-    float c  = v * s;
-    float x  = c * (1.0f - fabsf(fmodf(h / 60.0f, 2.0f) - 1.0f));
-    float m  = v - c;
-    float r1, g1, b1;
-
-    if      (h <  60) { r1 = c; g1 = x; b1 = 0; }
-    else if (h < 120) { r1 = x; g1 = c; b1 = 0; }
-    else if (h < 180) { r1 = 0; g1 = c; b1 = x; }
-    else if (h < 240) { r1 = 0; g1 = x; b1 = c; }
-    else if (h < 300) { r1 = x; g1 = 0; b1 = c; }
-    else              { r1 = c; g1 = 0; b1 = x; }
-
-    *r = (int)((r1 + m) * 255.0f + 0.5f);
-    *g = (int)((g1 + m) * 255.0f + 0.5f);
-    *b = (int)((b1 + m) * 255.0f + 0.5f);
-}
-
-/* ------------------------------------------------------------------ */
-/* Rainbow loop                                                         */
-/* step_deg: bước hue mỗi frame (nhỏ = mịn)                           */
-/* delay_us: delay mỗi frame (microsecond)                             */
-/* ------------------------------------------------------------------ */
-static void rainbow(float step_deg, int delay_us, float sat, float val)
-{
-    float hue = 0.0f;
-    int r, g, b;
-
-    printf("Rainbow running... (Ctrl+C to stop)\n");
-    printf("Step=%.3f deg  Delay=%d us  S=%.2f  V=%.2f\n",
-           step_deg, delay_us, sat, val);
-
-    signal(SIGINT,  handle_sigint);
-    signal(SIGTERM, handle_sigint);
-
-    while (running) {
-        hsv_to_rgb(hue, sat, val, &r, &g, &b);
-        set_rgb(r, g, b);
-
-        hue += step_deg;
-        if (hue >= 360.0f)
-            hue -= 360.0f;
-
-        usleep(delay_us);
-    }
-
-    all_off();
-    printf("\nStopped.\n");
-}
-
-/* ------------------------------------------------------------------ */
 /* Demo: chạy qua các màu cơ bản                                       */
 /* ------------------------------------------------------------------ */
 static void demo_colors(void)
 {
     printf("=== Demo colors ===\n");
 
-    printf("RED\n");       set_rgb(255,   0,   0); sleep(1);
-    printf("GREEN\n");     set_rgb(  0, 255,   0); sleep(1);
-    printf("BLUE\n");      set_rgb(  0,   0, 255); sleep(1);
-    printf("YELLOW\n");    set_rgb(255, 255,   0); sleep(1);
-    printf("CYAN\n");      set_rgb(  0, 255, 255); sleep(1);
-    printf("MAGENTA\n");   set_rgb(255,   0, 255); sleep(1);
-    printf("WHITE\n");     set_rgb(255, 255, 255); sleep(1);
-    printf("OFF\n");       all_off();
+    printf("RED\n");     RGBLed_Show(RGB_RED);     sleep(1);
+    printf("GREEN\n");   RGBLed_Show(RGB_GREEN);   sleep(1);
+    printf("BLUE\n");    RGBLed_Show(RGB_BLUE);    sleep(1);
+    printf("YELLOW\n");  RGBLed_Show(RGB_YELLOW);  sleep(1);
+    printf("CYAN\n");    RGBLed_Show(RGB_CYAN);    sleep(1);
+    printf("MAGENTA\n"); RGBLed_Show(RGB_MAGENTA); sleep(1);
+    printf("WHITE\n");   RGBLed_Show(RGB_WHITE);   sleep(1);
+    printf("OFF\n");     RGBLed_Off();
 }
 
 /* ------------------------------------------------------------------ */
@@ -469,15 +670,43 @@ static void demo_fade(void)
     int i;
     printf("=== Fade RED ===\n");
 
-    for (i = 0; i <= 255; i += 5) {
-        write_brightness(fd_r, i);
-        usleep(20000);
+    for (i = 0; i <= PWM_MAX_DUTY; i += 10) {
+        RGBLed_Show((RGB_Led){ i, 0, 0 });
+        usleep(10000);
     }
-    for (i = 255; i >= 0; i -= 5) {
-        write_brightness(fd_r, i);
-        usleep(20000);
+    for (i = PWM_MAX_DUTY; i >= 0; i -= 10) {
+        RGBLed_Show((RGB_Led){ i, 0, 0 });
+        usleep(10000);
     }
-    all_off();
+    RGBLed_Off();
+}
+
+/* ------------------------------------------------------------------ */
+/* Rainbow — xoay hue liên tục bằng HSVtoRGB                          */
+/* ------------------------------------------------------------------ */
+static void rainbow(float step_deg, int delay_us, int sat, int val)
+{
+    float hue = 0.0f;
+
+    printf("Rainbow running... (Ctrl+C to stop)\n");
+    printf("Step=%.3f deg  Delay=%d us  S=%d  V=%d\n",
+           step_deg, delay_us, sat, val);
+
+    signal(SIGINT,  handle_sigint);
+    signal(SIGTERM, handle_sigint);
+
+    while (running) {
+        RGBLed_Show(HSVtoRGB(hue, sat, val));
+
+        hue += step_deg;
+        if (hue >= 360.0f)
+            hue -= 360.0f;
+
+        usleep(delay_us);
+    }
+
+    RGBLed_Off();
+    printf("\nStopped.\n");
 }
 
 /* ------------------------------------------------------------------ */
@@ -488,17 +717,17 @@ static void print_usage(const char *prog)
     printf("Usage:\n");
     printf("  %s demo                        - chay qua 7 mau co ban\n", prog);
     printf("  %s fade                        - fade in/out RED\n", prog);
-    printf("  %s set R G B                   - dat mau (0-255)\n", prog);
+    printf("  %s set R G B                   - dat mau (0-%d)\n", prog, PWM_MAX_DUTY);
     printf("  %s off                         - tat het\n", prog);
     printf("  %s rainbow [step] [delay_ms] [sat] [val]\n", prog);
     printf("       step    : buoc hue moi frame (default 0.5 deg)\n");
     printf("       delay_ms: delay moi frame    (default 10 ms)\n");
-    printf("       sat     : saturation 0.0-1.0 (default 1.0)\n");
-    printf("       val     : brightness 0.0-1.0 (default 1.0)\n");
+    printf("       sat     : saturation 0-%d   (default %d)\n", PWM_MAX_DUTY, PWM_MAX_DUTY);
+    printf("       val     : brightness 0-%d   (default %d)\n", PWM_MAX_DUTY, PWM_MAX_DUTY);
     printf("\nVi du:\n");
-    printf("  %s rainbow              # min, vua phai\n", prog);
-    printf("  %s rainbow 0.1 5        # rat min, nhanh\n", prog);
-    printf("  %s rainbow 1.0 5 1.0 0.5  # nhanh, toi 50%%\n", prog);
+    printf("  %s rainbow\n", prog);
+    printf("  %s rainbow 0.1 5\n", prog);
+    printf("  %s rainbow 1.0 5 1000 500\n", prog);
 }
 
 int main(int argc, char *argv[])
@@ -508,7 +737,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    open_leds();
+    RGBLed_Init();
 
     if (strcmp(argv[1], "demo") == 0) {
         demo_colors();
@@ -519,51 +748,52 @@ int main(int argc, char *argv[])
     } else if (strcmp(argv[1], "set") == 0) {
         if (argc < 5) {
             fprintf(stderr, "Usage: %s set R G B\n", argv[0]);
-            close_leds();
             return 1;
         }
-        int r = atoi(argv[2]);
-        int g = atoi(argv[3]);
-        int b = atoi(argv[4]);
-        printf("Set RGB(%d, %d, %d)\n", r, g, b);
-        set_rgb(r, g, b);
+        RGB_Led c = {
+            .red_value   = atoi(argv[2]),
+            .green_value = atoi(argv[3]),
+            .blue_value  = atoi(argv[4]),
+        };
+        printf("Set RGB(%d, %d, %d)\n", c.red_value, c.green_value, c.blue_value);
+        RGBLed_Show(c);
 
     } else if (strcmp(argv[1], "off") == 0) {
-        all_off();
+        RGBLed_Off();
         printf("OFF\n");
 
     } else if (strcmp(argv[1], "rainbow") == 0) {
         float step  = argc >= 3 ? atof(argv[2]) : 0.5f;
         int   delay = argc >= 4 ? atoi(argv[3]) * 1000 : 10000;
-        float sat   = argc >= 5 ? atof(argv[4]) : 1.0f;
-        float val   = argc >= 6 ? atof(argv[5]) : 1.0f;
+        int   sat   = argc >= 5 ? atoi(argv[4]) : PWM_MAX_DUTY;
+        int   val   = argc >= 6 ? atoi(argv[5]) : PWM_MAX_DUTY;
 
-        /* Clamp */
-        if (step < 0.01f) step = 0.01f;
-        if (sat  < 0.0f)  sat  = 0.0f;
-        if (sat  > 1.0f)  sat  = 1.0f;
-        if (val  < 0.0f)  val  = 0.0f;
-        if (val  > 1.0f)  val  = 1.0f;
+        if (step < 0.01f)        step = 0.01f;
+        if (sat  < 0)            sat  = 0;
+        if (sat  > PWM_MAX_DUTY) sat  = PWM_MAX_DUTY;
+        if (val  < 0)            val  = 0;
+        if (val  > PWM_MAX_DUTY) val  = PWM_MAX_DUTY;
 
         rainbow(step, delay, sat, val);
 
     } else {
         fprintf(stderr, "Unknown command: %s\n", argv[1]);
         print_usage(argv[0]);
-        close_leds();
         return 1;
     }
 
-    close_leds();
     return 0;
 }
+
 ```
+
 
 ### `package/pwm_test/Config.in`
 
 ```
 config BR2_PACKAGE_PWM_TEST
 	bool "pwm_test"
+	select BR2_PACKAGE_RGB
 	help
 	  Userspace test application for PWM RGB LED.
 ```
@@ -577,9 +807,11 @@ PWM_TEST_SITE_METHOD = local
 
 define PWM_TEST_BUILD_CMDS
 	$(TARGET_CC) $(TARGET_CFLAGS) \
+		-I$(STAGING_DIR)/usr/include \
 		$(@D)/pwm_test.c \
-		-o $(@D)/pwm_test \
-		-lm
+		-L$(STAGING_DIR)/usr/lib \
+		-lrgb -lm \
+		-o $(@D)/pwm_test
 endef
 
 define PWM_TEST_INSTALL_TARGET_CMDS
@@ -591,12 +823,13 @@ $(eval $(generic-package))
 
 ---
 
-## Bước 5 — Đăng ký package với Buildroot
+## Bước 6 — Đăng ký package với Buildroot
 
 Thêm vào `package/Config.in`:
 
 ```
 source "package/pwm_rgb/Config.in"
+source "package/rgb/Config.in"
 source "package/pwm_test/Config.in"
 ```
 
@@ -604,20 +837,22 @@ Bật trong menuconfig:
 
 ```bash
 make menuconfig
-# Target packages → pwm_rgb → [*]
-# Target packages → pwm_test → [*]
+# Target packages → pwm_rgb  → [*]
+# Target packages → rgb       → [*]
+# Target packages → pwm_test  → [*]
 ```
 
 ---
 
-## Bước 6 — Build
+## Bước 7 — Build
 
 ```bash
 # Build kernel + DTB
 make linux-rebuild
 
-# Build packages
+# Build packages theo thứ tự
 make pwm_rgb-rebuild
+make rgb-rebuild
 make pwm_test-rebuild
 
 # Pack image
@@ -626,31 +861,35 @@ make
 
 ---
 
-## Bước 7 — Deploy lên board
+## Bước 8 — Deploy lên board
 
-### Copy nhanh qua SSH (không cần flash lại)
+### Thiết lập network USB RNDIS
 
 ```bash
-# Thiết lập network (USB RNDIS)
 sudo ip addr add 192.168.7.1/24 dev <interface>
 sudo ip link set <interface> up
+ping 192.168.7.2   # kiểm tra kết nối
+```
 
-# Copy file
-scp output/target/usr/bin/pwm_test root@192.168.7.2:/usr/bin/
-scp output/build/pwm_rgb-1.0/pwm_rgb.ko root@192.168.7.2:/lib/modules/
+### Copy file lên board
+
+```bash
+scp output/build/pwm_rgb-1.0/pwm_rgb.ko  root@192.168.7.2:/lib/modules/
+scp output/target/usr/lib/librgb.so       root@192.168.7.2:/usr/lib/
+scp output/target/usr/bin/pwm_test        root@192.168.7.2:/usr/bin/
 ```
 
 ---
 
-## Bước 8 — Test trên board
+## Bước 9 — Test trên board
+
+### Load driver
 
 ```bash
-# Load driver
 insmod /lib/modules/pwm_rgb.ko
 
 # Kiểm tra probe thành công
 dmesg | grep pwm
-# Output mong đợi:
 # pwm-rgb rgb-led: Registered LED: rgb:red
 # pwm-rgb rgb-led: Registered LED: rgb:green
 # pwm-rgb rgb-led: Registered LED: rgb:blue
@@ -664,26 +903,26 @@ ls /sys/class/leds/
 ### Test bằng sysfs trực tiếp
 
 ```bash
-echo 255 > /sys/class/leds/rgb:red/brightness    # bật đỏ
-echo 255 > /sys/class/leds/rgb:green/brightness  # bật xanh lá
-echo 255 > /sys/class/leds/rgb:blue/brightness   # bật xanh dương
-echo 0   > /sys/class/leds/rgb:red/brightness    # tắt đỏ
+echo 255 > /sys/class/leds/rgb:red/brightness
+echo 255 > /sys/class/leds/rgb:green/brightness
+echo 255 > /sys/class/leds/rgb:blue/brightness
+echo 0   > /sys/class/leds/rgb:red/brightness
 ```
 
-### Test bằng pwm_test app
+### Test bằng pwm_test
 
 ```bash
-pwm_test demo                    # demo 7 màu cơ bản
-pwm_test fade                    # fade in/out RED
-pwm_test set 255 0 0             # đặt màu đỏ
-pwm_test set 255 128 0           # màu cam
-pwm_test off                     # tắt hết
+pwm_test demo                      # chạy qua 7 màu cơ bản
+pwm_test fade                      # fade in/out RED
+pwm_test set 1000 0 0              # đỏ full
+pwm_test set 1000 500 0            # màu cam
+pwm_test off                       # tắt hết
 
 # Rainbow — chuyển màu cầu vồng liên tục
-pwm_test rainbow                 # mặc định: mịn, vừa phải
-pwm_test rainbow 0.1 5           # rất mịn, nhanh
-pwm_test rainbow 1.0 5 1.0 0.5  # nhanh, độ sáng 50%
-pwm_test rainbow 0.3 15 0.8 1.0 # màu pastel
+pwm_test rainbow                   # mặc định: mịn, vừa phải
+pwm_test rainbow 0.1 5             # rất mịn, nhanh
+pwm_test rainbow 1.0 5 1000 500    # nhanh, độ sáng 50%
+pwm_test rainbow 0.3 15 800 1000   # màu pastel
 # Ctrl+C để dừng
 ```
 
@@ -693,8 +932,8 @@ pwm_test rainbow 0.3 15 0.8 1.0 # màu pastel
 |---------|---------|---------|
 | step | Bước hue mỗi frame (độ) | 0.5 |
 | delay_ms | Delay mỗi frame (ms) | 10 |
-| saturation | Độ bão hòa 0.0–1.0 | 1.0 |
-| value | Độ sáng 0.0–1.0 | 1.0 |
+| sat | Saturation 0–1000 | 1000 |
+| val | Brightness 0–1000 | 1000 |
 
 ---
 
@@ -708,8 +947,12 @@ DTS (my,pwm-rgb)
  EHRPWM hardware (ehrpwm1, ehrpwm2)
       ↓ tín hiệu PWM ra chân vật lý
  /sys/class/leds/rgb:red|green|blue/brightness
-      ↓ userspace write 0–255
+      ↓ userspace ghi 0–255
  pwm_rgb_set_brightness() → duty cycle
+      ↓
+ librgb (PWM_SetDuty scale 0..1000 → 0..255)
+      ↓
+ pwm_test (RGBLed_Show / HSVtoRGB)
       ↓
  LED sáng theo màu mong muốn
 ```
