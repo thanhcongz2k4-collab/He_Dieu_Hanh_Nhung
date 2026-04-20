@@ -12,6 +12,6 @@ void SPI_Set_CE(uint8_t value);
 void SPI_Set_CSN(uint8_t value);
 
 void SPI_Config(void);
-uint16_t SPI_Transfer(uint16_t data);
+uint8_t SPI_Transfer(uint8_t data);
 
 #endif

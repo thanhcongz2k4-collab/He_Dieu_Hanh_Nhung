@@ -16,9 +16,14 @@
 #include "oled.h"
 #include "nrf24l01.h"
 #include "rgb_led.h"
+#include "pwm.h"
+#include "button.h"
 
 #include "mqtt.h"
 
-#define MQTT_TOPIC       "BeagleBone/RGB"
+
+#define MQTT_TOPIC_PUB  "BeagleBone/RGB/status"   // BBB gửi lên
+#define MQTT_TOPIC_SUB  "BeagleBone/RGB/set"       // BBB nhận lệnh
+
 
 #endif // __ALL_HEADER_H__
