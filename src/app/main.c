@@ -2,7 +2,7 @@
 
 // Định nghĩa hàm msleep để ngủ theo đơn vị milliseconds
 #define msleep(x) usleep((x) * 1000)
-volatile int button_flag = 0;
+volatile uint8_t auto_mode = 0;
 
 enum {
     IDLE_TASK_PRIORITY = 0,
@@ -81,13 +81,26 @@ int main(void)
 
 void* Task_Button(void *parameter)
 {
-    (void)parameter;
+    static uint8_t status = 0;
+    static uint8_t last_status = 0;
     Button_Config();
 
     while (1)
     {
-        Button_Read() ? (button_flag = 1) : (button_flag = 0);
-        msleep(100);
+        uint8_t is_pressed = 0;
+        status = Button_Read();
+
+        if(status && (status != last_status))
+        {
+            is_pressed = 1;
+        }
+        last_status = status;
+
+        if(is_pressed)
+        {
+            auto_mode = !auto_mode;
+        }
+        msleep(50);
     }
 
     Button_Deinit();
@@ -147,8 +160,8 @@ void* Task_RGB_auto_switch_collor(void *parameter)
     float hue = 0.0f;
 
     while (1) {
-        if (button_flag) {
-            msleep(100);
+        if (auto_mode == 0) {
+            msleep(10);
             continue;
         }
 
@@ -173,7 +186,7 @@ void* Task_NRF_Receiver(void *parameter)
     NRF_StartListening();
     while (1)
     {
-        if(!button_flag){
+        if(auto_mode == 1){
             msleep(100);
             continue;
         }
@@ -297,8 +310,8 @@ void* MQTT_Task(void *parameter)
 // Hàm callback xử lý tin nhắn MQTT nhận được
 void On_MQTT_HandleMessage(const char* topic, const char* payload)
 {
-    if(!button_flag){
-        printf("Button is pressed, ignoring MQTT message\n");
+    if(auto_mode == 1){
+        printf("Auto mode is enabled, ignoring MQTT message\n");
         return;
     }
     cJSON *root = cJSON_Parse(payload);
