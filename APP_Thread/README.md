@@ -55,9 +55,20 @@ buildroot/
     │   ├── Config.in
     │   └── rgb.mk
     │
+    │
+    ├── btn_lib/
+    │   ├── src/
+    │   │    └── button/  
+    │   │        ├── button.c       
+    │   │        └── button.h      
+    │   ├── btn_lib.mk          
+    │   └── Config.in
+    │
+    │
     └── app/                       # Ứng dụng chính
         ├── Config.in
         ├── app.mk
+        ├── S99app
         └── src/
             ├── main.c
             └── all_header.h
@@ -72,6 +83,7 @@ buildroot/
 | `oled` | Thư viện điều khiển OLED SSD1306 qua I2C | local |
 | `nrf24`| Thư viện điều khiển NRF24L01 qua SPI | local |
 | `rgb`  | Thư viện điều khiển led RGB | local |
+| `btn_lib`  | Thư viện nhận tín hiệu button | local |
 | `mqtt` | Wrapper mỏng cho paho-mqtt-c | local |
 | `cjson` | Parse JSON payload MQTT | Buildroot built-in |
 | `paho-mqtt-c` | MQTT client C library | Buildroot built-in |
@@ -88,6 +100,7 @@ config BR2_PACKAGE_APP
 	depends on BR2_PACKAGE_OLED
 	depends on BR2_PACKAGE_MQTT
 	depends on BR2_PACKAGE_NRF24
+	select BR2_PACKAGE_BTN_LIB
 	select BR2_PACKAGE_RGB
 	select BR2_PACKAGE_CJSON   
 	help
@@ -99,6 +112,12 @@ config BR2_PACKAGE_APP
 
 ### `package/app/app.mk`
 ```makefile
+
+################################################################################
+#
+# app
+#
+################################################################################
 
 APP_VERSION      = 1.0.0
 APP_SITE         = $(TOPDIR)/package/app/src
@@ -113,11 +132,14 @@ define APP_BUILD_CMDS
 		$(@D)/main.c \
 		-o $(@D)/app \
 		-L$(STAGING_DIR)/usr/lib \
-		-loled -lmqtt -lcjson -lpthread -lnrf24 -lrgb
+		-loled -lmqtt -lcjson -lpthread -lnrf24 -lrgb -lbtn
 endef
 
 define APP_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 0755 $(@D)/app $(TARGET_DIR)/usr/bin/app
+	
+	$(INSTALL) -D -m 0755 $(APP_PKGDIR)/S99app \
+	$(TARGET_DIR)/etc/init.d/S99app
 endef
 
 $(eval $(generic-package))
@@ -146,9 +168,12 @@ $(eval $(generic-package))
 #include "oled.h"
 #include "nrf24l01.h"
 #include "rgb_led.h"
+#include "button.h"
 #include "mqtt.h"
 
-#define DEVICE "/dev/btn"
+#include <fcntl.h>
+#include <linux/watchdog.h>
+#include <sys/ioctl.h>
 
 #define MQTT_TOPIC_PUB  "BeagleBone/RGB/status"   // BBB gửi lên
 #define MQTT_TOPIC_SUB  "BeagleBone/RGB/set"       // BBB nhận lệnh
@@ -160,6 +185,15 @@ $(eval $(generic-package))
 ### `src/main.c`
 ```c
 #include "all_header.h"
+
+// khai báo watchdog
+static time_t thread_heartbeat[5] = {0};
+#define HB_OLED   0
+#define HB_NRF    1
+#define HB_RGB    3
+// #define HB_MQTT   4
+// #define HB_BUTTON 5
+
 
 // Định nghĩa hàm msleep để ngủ theo đơn vị milliseconds
 #define msleep(x) usleep((x) * 1000)
@@ -194,13 +228,14 @@ void* Task_Oled(void *parameter);
 void* Task_NRF_Receiver(void *parameter);
 void* Task_Button(void *parameter);
 void* Task_RGB_auto_switch_collor(void *parameter);
+void* Task_Watchdog(void *parameter); 
 
 int main(void)
 {
     pthread_attr_t attr;
     struct sched_param param;
 
-    pthread_t t_oled, t_nrf, t_mqtt, t_button, t_rgb_auto;
+    pthread_t t_oled, t_nrf, t_mqtt, t_button, t_rgb_auto, t_watchdog;
     int rc;
 
     RGBLed_Init();
@@ -230,6 +265,9 @@ int main(void)
     rc = pthread_create(&t_rgb_auto, &attr, Task_RGB_auto_switch_collor, NULL);
     if (rc != 0) { printf("pthread_create Task_RGB_auto failed: %d\n", rc); return 1; }
 
+    rc = pthread_create(&t_watchdog, &attr, Task_Watchdog, NULL);
+    if (rc != 0) { printf("pthread_create Task_Watchdog failed: %d\n", rc); return 1; }
+
     pthread_attr_destroy(&attr);
 
     while (1)
@@ -243,35 +281,17 @@ int main(void)
 void* Task_Button(void *parameter)
 {
     (void)parameter;
-    int fd = open(DEVICE, O_RDONLY);
-    if (fd < 0)
-    {
-        perror("Failed to open button device");
-        return NULL;
-    }
+    Button_Config();
 
     while (1)
     {
-        char buf[16];
-        ssize_t bytes_read = read(fd, buf, sizeof(buf));
-        if (bytes_read < 0)
-        {
-            perror("Failed to read button state");
-            break;
-        }
-        if (bytes_read >= sizeof(buf))
-            bytes_read = sizeof(buf) - 1;
-        
-        buf[bytes_read] = '\0';
-        if(buf[0] == '1')
-        {
-            printf("Button pressed\n");
+        if(Button_Read()){
             button_flag = !button_flag;
         }
-        msleep(100);
+        msleep(20);
     }
 
-    close(fd);
+    Button_Deinit();
     return NULL;
 }
 
@@ -283,6 +303,8 @@ void* Task_Oled(void *parameter)
     Oled_Init();
     while (1)                   
     {
+        thread_heartbeat[HB_OLED] = time(NULL);
+
         msleep(20);
 
         pthread_mutex_lock(&rgb_data_mutex);
@@ -328,6 +350,8 @@ void* Task_RGB_auto_switch_collor(void *parameter)
     float hue = 0.0f;
 
     while (1) {
+        thread_heartbeat[HB_RGB] = time(NULL);
+
         if (button_flag) {
             msleep(100);
             continue;
@@ -354,6 +378,8 @@ void* Task_NRF_Receiver(void *parameter)
     NRF_StartListening();
     while (1)
     {
+        thread_heartbeat[HB_NRF] = time(NULL);
+
         if(!button_flag){
             msleep(100);
             continue;
@@ -517,6 +543,105 @@ void On_MQTT_HandleMessage(const char* topic, const char* payload)
 }
 
 
-```
+// Task watchdog để kick watchdog mỗi 5 giây
+void* Task_Watchdog(void *parameter)
+{
+    (void)parameter;
+    int ret;
+    int wdfd = open("/dev/watchdog", O_WRONLY);
+    if (wdfd < 0) { printf("Failed to open watchdog\n"); return NULL; }
 
+    int timeout = 30;
+    ioctl(wdfd, WDIOC_SETTIMEOUT, &timeout);
+
+    while (1)
+    {
+        time_t now = time(NULL);
+        int all_alive = 1;
+
+        // Kiểm tra tất cả thread, nếu thread nào không cập nhật quá 10 giây → coi như treo
+        for (int i = 0; i < 5; i++)
+        {
+            if (thread_heartbeat[i] != 0 && (now - thread_heartbeat[i]) > 10)
+            {
+                printf("Thread %d is stuck! Not kicking watchdog.\n", i);
+                all_alive = 0;
+                break;
+            }
+        }
+
+        if (all_alive)
+            ret = write(wdfd, "1", 1);
+            (void)ret;  // Chỉ kick khi tất cả thread còn sống
+
+        msleep(5000);
+    }
+
+    return NULL;
+}
+```
 ---
+
+## 5. Tự động
+
+### `app/S99app`
+
+```c
+#!/bin/sh
+#
+# S99app - Load kernel modules and start app
+#
+
+MODULES="pwm_rgb nrf24l01 btn ssd1306"
+APP="/usr/bin/app"
+PIDFILE="/var/run/app.pid"
+APP_LOG="/var/log/app.log"
+
+start() {
+    echo "Loading kernel modules..."
+    for mod in $MODULES; do
+        if ! lsmod | grep -q "^${mod}"; then
+            insmod /lib/modules/${mod}.ko
+            if [ $? -ne 0 ]; then
+                echo "Failed to load module: ${mod}"
+                return 1
+            fi
+            echo "Loaded: ${mod}"
+        else
+            echo "Already loaded: ${mod}"
+        fi
+    done
+
+    echo "Starting app..."
+    start-stop-daemon -S -b -m -p $PIDFILE -x $APP -- >> $APP_LOG 2>&1
+    echo "app started."
+}
+
+stop() {
+    echo "Stopping app..."
+    start-stop-daemon -K -p $PIDFILE
+    echo "app stopped."
+    echo "Unloading kernel modules..."
+    for mod in $(echo $MODULES | tr ' ' '\n' | awk '{a[i++]=$0} END {for(j=i-1;j>=0;j--) print a[j]}'); do
+        rmmod $mod 2>/dev/null && echo "Unloaded: ${mod}"
+    done
+}
+
+restart() {
+    stop
+    sleep 1
+    start
+}
+
+case "$1" in
+    start)   start   ;;
+    stop)    stop    ;;
+    restart) restart ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac
+
+exit 0
+```

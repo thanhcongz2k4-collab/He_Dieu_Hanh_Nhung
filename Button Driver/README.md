@@ -16,6 +16,16 @@ package/
 │   ├── button.mk          # Buildroot package
 │   └── Config.in
 │
+│
+├── btn_lib/
+│   ├── src/
+│   │    └── button/  
+│   │        ├── button.c       
+│   │        └── button.h      
+│   ├── btn_lib.mk          
+│   └── Config.in
+│
+│
 └── button_test/
     ├── src/
     │   └── button_test.c  # Userspace test app
@@ -29,7 +39,7 @@ package/
 
 Driver tạo char device `/dev/btn`. Khi userspace gọi `read()`, process sẽ **block** cho đến khi có ngắt GPIO (nhấn hoặc nhả nút). Driver trả về `"1\n"` khi nhấn, `"0\n"` khi nhả.
 
-```
+```git checkout kernel_driver
 User process          Kernel driver           Hardware
     |                     |                      |
     |---- read() -------->|                      |
@@ -47,7 +57,7 @@ Debounce 50ms được xử lý trong ISR bằng `jiffies`.
 
 ### `package/button/src/btn.c`
 
-```
+```c
 // SPDX-License-Identifier: GPL-2.0
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -62,7 +72,7 @@ Debounce 50ms được xử lý trong ISR bằng `jiffies`.
 #define DEVICE_NAME "btn"
 #define CLASS_NAME  "btn"
 #define BUTTON_GPIO 525
-#define DEBOUNCE_MS 100
+#define DEBOUNCE_MS 200
 
 static int major;
 static struct class *btn_class;
@@ -263,6 +273,124 @@ config BR2_PACKAGE_BUTTON
 ```
 
 ---
+
+### `package/btn_lib/src/button/button.c`
+
+```c
+#include "button.h"
+
+static int fd = -1;
+
+uint8_t Button_Config(void)
+{
+    fd = open(DEVICE, O_RDONLY);
+    if (fd < 0)
+    {
+        perror("Failed to open button device");
+        return 0;
+    }
+    return 1;
+}
+
+uint8_t Button_Read(void)
+{
+    char buf[16];
+    ssize_t bytes_read = read(fd, buf, sizeof(buf));
+    if (bytes_read < 0)
+    {
+        perror("Failed to read button state");
+        return 0;
+    }
+    if (bytes_read >= (ssize_t)sizeof(buf))
+        bytes_read = sizeof(buf) - 1;
+
+    buf[bytes_read] = '\0';
+    return (buf[0] == '1') ? 1 : 0;
+}
+
+void Button_Deinit(void)
+{
+    if (fd >= 0)
+    {
+        close(fd);
+        fd = -1;
+    }
+}
+```
+### `package/btn_lib/src/button/button.h`
+
+```c
+#ifndef __BUTTON_H__
+#define __BUTTON_H__
+
+#include <stdint.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+
+#define DEVICE "/dev/btn"
+uint8_t Button_Config(void);
+uint8_t Button_Read(void);
+void    Button_Deinit(void);
+
+#endif /* __BUTTON_H__ */
+```
+### `package/btn_lib/btn_lib.mk`
+
+```
+################################################################################
+# Buildroot package for Button library
+################################################################################
+
+BTN_LIB_VERSION     = 1.0
+BTN_LIB_SITE        = $(TOPDIR)/package/btn_lib/src
+BTN_LIB_SITE_METHOD = local
+BTN_LIB_INSTALL_STAGING = YES
+
+# -----------------------------------------------------------------------------
+# Build
+# -----------------------------------------------------------------------------
+define BTN_LIB_BUILD_CMDS
+	$(TARGET_CC) $(TARGET_CFLAGS) -fPIC \
+		-I$(@D)/button \
+		-c $(@D)/button/button.c -o $(@D)/button.o
+
+	$(TARGET_AR) rcs $(@D)/libbtn.a $(@D)/button.o
+
+	$(TARGET_CC) -shared -o $(@D)/libbtn.so $(@D)/button.o
+endef
+
+# -----------------------------------------------------------------------------
+# Install to staging
+# -----------------------------------------------------------------------------
+define BTN_LIB_INSTALL_STAGING_CMDS
+	$(INSTALL) -D -m 0644 $(@D)/libbtn.a        $(STAGING_DIR)/usr/lib/libbtn.a
+	$(INSTALL) -D -m 0755 $(@D)/libbtn.so       $(STAGING_DIR)/usr/lib/libbtn.so
+	$(INSTALL) -D -m 0644 $(@D)/button/button.h $(STAGING_DIR)/usr/include/button.h
+endef
+
+# -----------------------------------------------------------------------------
+# Install to target
+# -----------------------------------------------------------------------------
+define BTN_LIB_INSTALL_TARGET_CMDS
+	$(INSTALL) -D -m 0755 $(@D)/libbtn.so $(TARGET_DIR)/usr/lib/libbtn.so
+endef
+
+$(eval $(generic-package))
+```
+
+### `package/btn_lib/Config.in`
+
+```
+config BR2_PACKAGE_BTN_LIB
+	bool "btn_lib"
+	help
+	  Button library for BeagleBone Black.
+	  Reads button state from /dev/btn.
+	  Installs libbtn.a and libbtn.so.
+```
+
+
 
 ### `package/button_test/src/button_test.c`
 
