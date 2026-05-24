@@ -182,7 +182,7 @@ struct pwm_rgb_priv {
 static void pwm_rgb_set_brightness(struct led_classdev *cdev,
                                    enum led_brightness brightness)
 {
-    struct pwm_rgb_led *led = container_of(cdev, struct pwm_rgb_led, cdev);
+    struct pwm_rgb_led *led = container_of(cdev, struct pwm_rgb_led, cdev); // Có địa chỉ của một member trong struct --> lấy địa chỉ của struct chứa nó
     struct pwm_state state;
     u64 duty;
 
@@ -209,13 +209,13 @@ static int pwm_rgb_probe(struct platform_device *pdev)
     const char *pwm_names[3] = { "red", "green", "blue" };
     int i, ret;
 
-    priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+    priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL); // Cấp phát bộ nhớ cho struct pwm_rgb_priv, tự động giải phóng khi device (dev) bị remove
     if (!priv)
         return -ENOMEM;
 
     for (i = 0; i < 3; i++) {
         /* Lấy PWM theo tên khai báo trong DTS: pwm-names = "red","green","blue" */
-        priv->leds[i].pwm = devm_pwm_get(dev, pwm_names[i]);
+        priv->leds[i].pwm = devm_pwm_get(dev, pwm_names[i]); // Lấy handle PWM từ DTS theo tên "red", "green", "blue"
         if (IS_ERR(priv->leds[i].pwm)) {
             dev_err(dev, "Failed to get PWM '%s': %ld\n",
                     pwm_names[i], PTR_ERR(priv->leds[i].pwm));
@@ -228,7 +228,7 @@ static int pwm_rgb_probe(struct platform_device *pdev)
         priv->leds[i].cdev.max_brightness = 255;
         priv->leds[i].cdev.brightness_set = pwm_rgb_set_brightness;
 
-        ret = led_classdev_register(dev, &priv->leds[i].cdev);
+        ret = led_classdev_register(dev, &priv->leds[i].cdev); // Đăng ký LED class device, tạo entry trong /sys/class/leds/
         if (ret) {
             dev_err(dev, "Failed to register LED '%s': %d\n", names[i], ret);
             return ret;
@@ -237,7 +237,7 @@ static int pwm_rgb_probe(struct platform_device *pdev)
         dev_info(dev, "Registered LED: %s\n", names[i]);
     }
 
-    platform_set_drvdata(pdev, priv);
+    platform_set_drvdata(pdev, priv); // Lưu pointer đến struct pwm_rgb_priv trong platform device để dùng khi remove 
     dev_info(dev, "PWM RGB driver probed OK\n");
     return 0;
 }
@@ -247,15 +247,15 @@ static int pwm_rgb_probe(struct platform_device *pdev)
 /* ------------------------------------------------------------------ */
 static void pwm_rgb_remove(struct platform_device *pdev)
 {
-    struct pwm_rgb_priv *priv = platform_get_drvdata(pdev);
+    struct pwm_rgb_priv *priv = platform_get_drvdata(pdev); // Lấy pointer đến struct pwm_rgb_priv đã lưu trong probe
     struct pwm_state state;
     int i;
 
     for (i = 0; i < 3; i++) {
-	led_classdev_unregister(&priv->leds[i].cdev); 
-        pwm_get_state(priv->leds[i].pwm, &state);
-        state.enabled = false;
-        pwm_apply_might_sleep(priv->leds[i].pwm, &state);
+	led_classdev_unregister(&priv->leds[i].cdev);           // Hủy đăng ký LED class device, xóa entry trong /sys/class/leds/
+        pwm_get_state(priv->leds[i].pwm, &state);           // Lấy trạng thái hiện tại của PWM
+        state.enabled = false;                              // Tắt PWM khi driver bị remove
+        pwm_apply_might_sleep(priv->leds[i].pwm, &state);   // Áp dụng trạng thái mới cho PWM, đảm bảo tắt LED khi driver bị remove
     }
 }
 
@@ -266,8 +266,11 @@ static const struct of_device_id pwm_rgb_of_match[] = {
     { .compatible = "my,pwm-rgb" },
     { /* sentinel */ }
 };
-MODULE_DEVICE_TABLE(of, pwm_rgb_of_match);
 
+MODULE_DEVICE_TABLE(of, pwm_rgb_of_match); // Đăng ký bảng match với kernel để hỗ trợ autoload driver khi phát hiện node compatible trong DTS
+
+
+/* Platform driver structure */
 static struct platform_driver pwm_rgb_driver = {
     .probe  = pwm_rgb_probe,
     .remove = pwm_rgb_remove,
@@ -277,7 +280,7 @@ static struct platform_driver pwm_rgb_driver = {
     },
 };
 
-module_platform_driver(pwm_rgb_driver);
+module_platform_driver(pwm_rgb_driver); // Macro đăng ký platform driver, tự động tạo init/exit functions
 
 MODULE_AUTHOR("BBB Developer");
 MODULE_DESCRIPTION("PWM RGB LED Driver for BeagleBone Black");
